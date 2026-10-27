@@ -13,9 +13,9 @@
 2. Select **File > Open World...** and navigate to:
    `artisan_confectionery_project/worlds/confectionery_cell.wbt`
 3. Inspect the scene tree on the left panel:
-   - Check the **UR5e** robot node.
-   - Check that its `toolSlot` contains the **Robotiq2f85** gripper.
-   - Locate the **Camera** node mounted overhead at $[0, 0.4, 0.8]$ looking down.
+   - Check the **CellUR5e** robot node (`protos/CellUR5e.proto`).
+   - Check that its `baseSlot` contains the fixed overhead **Camera** node at $[0, 0.4, 0.8]$ looking straight down.
+   - Check that its `toolSlot` contains the **Robotiq2f85Gripper** and **TouchSensor**.
    - Locate the **infeed_pedestal**, **blister_tray_fixture**, and **remelt_reject_chute**.
 
 ### Step 2: Test Robot Joint Motors & Poses
@@ -29,11 +29,11 @@
 2. Test moving the robot to `HOME_POSE_JOINTS` and verifying that the arm moves smoothly without colliding with the table or camera mount.
 
 ### Step 3: Implement & Verify Gripper Contact
-1. Verify the Robotiq 2F-85 gripper action:
-   - Left knuckle joint: `robotiq_85_left_knuckle_joint`
-   - Right knuckle joint: `robotiq_85_right_knuckle_joint`
+1. Verify the Robotiq 2F-85 gripper action (in Webots R2025a `Robotiq2f85Gripper.proto`):
+   - Left finger motor: `ROBOTIQ 2F-85 Gripper::left finger joint` (or `robotiq_85_left_knuckle_joint`)
+   - Right finger motor: `ROBOTIQ 2F-85 Gripper::right finger joint` (or `robotiq_85_right_knuckle_joint`)
    - Open position: `0.0 rad`
-   - Closed position: `0.85 rad`
+   - Closed position: `0.80 rad`
 2. Configure or verify the `TouchSensor` on the inner finger pad:
    - In Webots, ensure the touch sensor returns a non-zero value when clamping onto the chocolate workpiece.
    - If using a simulated distance sensor, calibrate the threshold to detect workpiece presence.

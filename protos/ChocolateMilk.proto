@@ -1,4 +1,4 @@
-#VRML_SIM R2023b utf8
+#VRML_SIM R2025a utf8
 # Modeled Milk Chocolate Piece (Cylindrical / Rounded)
 
 PROTO ChocolateMilk [
@@ -15,8 +15,8 @@ PROTO ChocolateMilk [
       Shape {
         appearance PBRAppearance {
           baseColor 0.35 0.20 0.10
-          roughness 0.4
-          metalness 0.05
+          roughness 0.8
+          metalness 0
         }
         geometry Cylinder {
           height 0.020
@@ -29,7 +29,7 @@ PROTO ChocolateMilk [
       radius 0.018
     }
     physics Physics {
-      density 1300
+      density -1
       mass 0.024
     }
   }

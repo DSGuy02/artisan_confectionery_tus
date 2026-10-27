@@ -78,7 +78,7 @@ def extract_orientation_and_centroid(contour):
     
     # Normalize angle so it aligns parallel to the major grasp axis
     angle = raw_angle
-    if width < height:
+    if (height - width) >= 2.0:
         angle = raw_angle + 90.0
         width, height = height, width
         
@@ -88,9 +88,12 @@ def extract_orientation_and_centroid(contour):
     while angle <= -90.0:
         angle += 180.0
         
-    # For nearly square contours at +/-90 deg, normalize to 0.0 deg
-    if abs(width - height) < 2.0 and abs(abs(angle) - 90.0) < 1.0:
-        angle = 0.0
+    # For nearly square contours, normalize 90 deg -> 0.0 deg and -45 deg -> +45.0 deg
+    if abs(width - height) < 2.0:
+        if abs(abs(angle) - 90.0) < 1.0:
+            angle = 0.0
+        elif abs(angle + 45.0) < 1.0:
+            angle = 45.0
         
     return (cx, cy), angle, (width, height)
 
@@ -175,13 +178,21 @@ def inspect_chocolate(bgr_image, min_contour_area=250):
     mask_clean = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
     mask_clean = cv2.morphologyEx(mask_clean, cv2.MORPH_OPEN, kernel)
     
-    # 3. Contour Extraction
-    contours, _ = cv2.findContours(mask_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
+    # 3. Contour Extraction (ignore border-touching background or stage-sized contours)
+    max_contour_area = 0.25 * (w * h)
+    contours, _ = cv2.findContours(mask_clean, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    valid_contours = [
+        c for c in contours
+        if (lambda bx, by, bw, bh, area: (
+            bx > 1 and by > 1 and (bx + bw) < (w - 1) and (by + bh) < (h - 1)
+            and area < max_contour_area
+        ))(*cv2.boundingRect(c), cv2.contourArea(c))
+    ]
+    if not valid_contours:
         return {"valid": False, "reason": "No workpiece contour detected"}
         
-    # Largest contour is the chocolate piece
-    largest_contour = max(contours, key=cv2.contourArea)
+    # Largest interior contour is the chocolate piece
+    largest_contour = max(valid_contours, key=cv2.contourArea)
     area = cv2.contourArea(largest_contour)
     if area < min_contour_area:
         return {"valid": False, "reason": f"Contour area {area} below threshold"}
@@ -249,7 +260,8 @@ def draw_inspection_overlay(bgr_image, result):
     cv2.arrowedLine(annotated, (cx, cy), (end_x, end_y), (0, 255, 255), 2, tipLength=0.3)
     cv2.circle(annotated, (cx, cy), 4, (0, 0, 255), -1)
     
-    # Display text summary
+    # Display text summary on a dark HUD banner for contrast against light backgrounds
+    cv2.rectangle(annotated, (10, 5), (450, 102), (30, 30, 30), -1)
     status_text = "REJECT: DEFECT" if is_defective else "PASS: QUALITY OK"
     cv2.putText(annotated, f"Type: {choc_type} | Status: {status_text}", 
                 (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, color, 2)

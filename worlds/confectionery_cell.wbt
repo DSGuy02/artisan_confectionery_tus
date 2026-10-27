@@ -3,7 +3,7 @@
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/Floor.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/universal_robots/protos/UR5e.proto"
+EXTERNPROTO "../protos/CellUR5e.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/robotiq/protos/Robotiq2f85Gripper.proto"
 
 WorldInfo {
@@ -55,14 +55,16 @@ Solid {
   }
 }
 
-# Infeed Inspection Pedestal
+# Infeed Inspection Pedestal (Backlit White Vision Diffuser Stage)
 Solid {
   translation 0 0.4 0.02
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0.95 0.95 0.95
-        roughness 0.2
+        baseColor 0.96 0.96 0.96
+        roughness 0.9
+        metalness 0
+        emissiveColor 0.88 0.88 0.88
       }
       geometry Cylinder {
         height 0.04
@@ -85,6 +87,7 @@ Solid {
       appearance PBRAppearance {
         baseColor 0.85 0.88 0.92
         roughness 0.3
+        metalness 0
       }
       geometry Box {
         size 0.14 0.14 0.04
@@ -105,6 +108,7 @@ Solid {
       appearance PBRAppearance {
         baseColor 0.9 0.2 0.2
         roughness 0.5
+        metalness 0
       }
       geometry Cylinder {
         height 0.10
@@ -127,7 +131,8 @@ Solid {
     Shape {
       appearance PBRAppearance {
         baseColor 0.15 0.08 0.04 # Dark chocolate
-        roughness 0.3
+        roughness 0.8
+        metalness 0
       }
       geometry Box {
         size 0.035 0.035 0.02
@@ -139,19 +144,35 @@ Solid {
     size 0.035 0.035 0.02
   }
   physics Physics {
-    density 1300
+    density -1
     mass 0.025
   }
 }
 
 # Universal Robots UR5e Articulated Arm
-# Note for Partner 1: In Webots, all sensors (Camera, TouchSensor) controlled by
-# 'cell_supervisor' must reside inside the UR5e Robot node (e.g., in toolSlot, or
-# in the base children after right-clicking UR5e -> 'Convert to Base Nodes').
-UR5e {
+# Note: In Webots, a controller can only read devices that are inside its own
+# Robot node. CellUR5e (protos/CellUR5e.proto) is the official UR5e plus a
+# 'baseSlot' field, so the FIXED overhead camera can sit in the robot while
+# not moving with the arm. Devices that move with the gripper go in 'toolSlot'.
+CellUR5e {
   translation 0 0 0
   controller "cell_supervisor"
   supervisor TRUE
+  baseSlot [
+    # Overhead inspection camera: fixed 0.8 m above the infeed pedestal, looking
+    # straight down. Rotation makes image-right = world +X and image-up = world +Y,
+    # which is what pixel_to_world_coordinates() in vision_pipeline.py assumes.
+    # fieldOfView 0.4646 rad gives a ~0.35 m x 0.26 m view at the chocolate top
+    # surface (z = 0.06 m), matching the default fov_width_m / fov_height_m.
+    Camera {
+      translation 0 0.4 0.8
+      rotation -0.57735 0.57735 0.57735 2.0944
+      name "camera"
+      fieldOfView 0.4646
+      width 640
+      height 480
+    }
+  ]
   toolSlot [
     Robotiq2f85Gripper {
     }
@@ -162,16 +183,9 @@ UR5e {
         radius 0.012
       }
       physics Physics {
+        density -1
         mass 0.01
       }
-    }
-    Camera {
-      translation 0 0.05 0.05
-      rotation 0 1 0 -1.5708
-      name "camera"
-      fieldOfView 0.65
-      width 640
-      height 480
     }
   ]
 }

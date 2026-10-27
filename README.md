@@ -20,6 +20,7 @@ artisan_confectionery_project/
 ├── .gitignore                      # Git ignore rules for Python, Webots, and OS caches
 ├── requirements.txt                # Python dependencies (numpy, opencv-python, matplotlib)
 ├── setup_env.sh                    # Automated venv creation and setup script
+├── setup_webots_flatpak.sh         # Installs numpy & OpenCV into Webots Flatpak sandbox
 ├── README.md                       # Main project documentation and instructions
 │
 ├── worlds/                         # Webots simulation worlds
@@ -30,6 +31,7 @@ artisan_confectionery_project/
 │       └── cell_supervisor.py     # Master Python Finite State Machine (FSM)
 │
 ├── protos/                         # Webots custom PROTO nodes
+│   ├── CellUR5e.proto              # UR5e with baseSlot for fixed overhead camera
 │   ├── ChocolateDark.proto         # Dark chocolate model
 │   ├── ChocolateMilk.proto         # Milk chocolate model
 │   └── ChocolateRuby.proto         # Ruby chocolate model
@@ -64,6 +66,7 @@ artisan_confectionery_project/
 ./setup_env.sh
 source venv/bin/activate
 ```
+*(If you run Webots via **Flatpak**, also run `./setup_webots_flatpak.sh` once so Webots' sandboxed Python has `numpy` and `opencv-python-headless` installed).*
 
 ### 3.2 Verify Vision Pipeline Offline (No Webots Needed)
 Partner 2 can test the OpenCV pipeline immediately on synthetic images:

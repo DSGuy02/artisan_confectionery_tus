@@ -32,8 +32,11 @@ venv.bak/
 *.webots_cache/
 *.wbo
 *.wbop
+*.wbproj
+.*.wbproj
 *.lock
 *.log
+.webots_pydeps.*
 
 # Operating System & IDE Configurations
 .DS_Store

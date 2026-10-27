@@ -89,11 +89,13 @@ class ConfectioneryCellSupervisor:
 
         # 4. Initialize Robotiq 2F-85 Gripper Actuators (Supports multiple PROTO naming conventions)
         self.finger_left = self._find_first_device([
+            "ROBOTIQ 2F-85 Gripper::left finger joint",
             "robotiq_85_left_knuckle_joint",
             "Robotiq 2F-85 Gripper::left finger joint",
             "finger_1_joint_1"
         ])
         self.finger_right = self._find_first_device([
+            "ROBOTIQ 2F-85 Gripper::right finger joint",
             "robotiq_85_right_knuckle_joint",
             "Robotiq 2F-85 Gripper::right finger joint",
             "finger_2_joint_1"
@@ -194,7 +196,7 @@ class ConfectioneryCellSupervisor:
                     if detection.get("valid", False):
                         self.current_detection = detection
                         self.cycle_id += 1
-                        self.cycle_start_time = time.time()
+                        self.cycle_start_time = self.robot.getTime()
                         self.state = "EVALUATE_QUALITY"
                         self.wait_steps = 20
                         print(f"\n[CYCLE {self.cycle_id}] Workpiece Sensed on Infeed.")
@@ -220,8 +222,8 @@ class ConfectioneryCellSupervisor:
             elif self.state == "PICK_APPROACH":
                 angle_deg = self.current_detection["orientation_deg"]
                 wrist_yaw = (angle_deg / 180.0) * 3.14159
-                # TODO (Partner 1): Replace placeholder joint angles with calibrated IK / pick waypoints
-                pick_pose = [0.0, -1.35, 1.65, -1.87, -1.5708, wrist_yaw]
+                # TODO (Partner 1): Refine calibrated IK / pick waypoints for exact grasp height
+                pick_pose = [1.36, -1.32, 2.40, -2.65, -1.5708, wrist_yaw]
                 self.set_joint_positions(pick_pose)
                 self.state = "GRASP_AND_VERIFY"
                 self.wait_steps = 60
@@ -230,14 +232,19 @@ class ConfectioneryCellSupervisor:
             # FSM STATE 4: GRASP_AND_VERIFY
             # ---------------------------------------------------------------
             elif self.state == "GRASP_AND_VERIFY":
-                self.set_gripper(open_pos=False)
-                if self.verify_grasp():
-                    print("[GRIP CONFIRMED] Touch sensor validated positive contact.")
-                    self.state = "TRANSFER_TRAY"
+                if not getattr(self, "gripper_closing_done", False):
+                    self.set_gripper(open_pos=False)
+                    self.gripper_closing_done = True
+                    self.wait_steps = 35  # Allow gripper fingers to close before sampling touch sensor
                 else:
-                    print("[FAULT] Grip verification failed or dropped piece! Executing SAFE_RECOVERY.")
-                    self.state = "SAFE_RECOVERY"
-                self.wait_steps = 40
+                    self.gripper_closing_done = False
+                    if self.verify_grasp():
+                        print("[GRIP CONFIRMED] Touch sensor validated positive contact.")
+                        self.state = "TRANSFER_TRAY"
+                    else:
+                        print("[FAULT] Grip verification failed or dropped piece! Executing SAFE_RECOVERY.")
+                        self.state = "SAFE_RECOVERY"
+                    self.wait_steps = 40
 
             # ---------------------------------------------------------------
             # FSM STATE 5: TRANSFER_TRAY
@@ -247,7 +254,9 @@ class ConfectioneryCellSupervisor:
                 target_slot = get_slot_by_variety(variety)
                 slot_info = get_tray_slot_target(target_slot)
                 print(f"[TRANSFER] Routing to 2x2 Blister Tray {slot_info['name']}.")
-                # TODO (Partner 1): Command UR5e joints to target blister tray slot pose
+                # TODO (Partner 1): Calibrate per-slot IK joint angles from slot_info (X, Y, Z)
+                tray_pose = [0.25, -1.32, 2.40, -2.65, -1.5708, 0.0]
+                self.set_joint_positions(tray_pose)
                 self.state = "PLACE_AND_RELEASE"
                 self.wait_steps = 60
 
@@ -256,7 +265,7 @@ class ConfectioneryCellSupervisor:
             # ---------------------------------------------------------------
             elif self.state == "PLACE_AND_RELEASE":
                 self.set_gripper(open_pos=True)
-                cycle_time = time.time() - self.cycle_start_time
+                cycle_time = self.robot.getTime() - self.cycle_start_time
                 variety = self.current_detection["chocolate_type"]
                 angle = self.current_detection["orientation_deg"]
                 solidity = self.current_detection["solidity"]
@@ -275,10 +284,12 @@ class ConfectioneryCellSupervisor:
             # ---------------------------------------------------------------
             elif self.state == "REJECT_ROUTINE":
                 print("[REJECT] Transferring defective item to Gravity Remelt Chute.")
-                # TODO (Partner 1): Command UR5e joints to REJECT_CHUTE_TARGET
+                # TODO (Partner 1): Calibrate exact UR5e joint angles for REJECT_CHUTE_TARGET
+                reject_pose = [2.20, -1.32, 2.40, -2.65, -1.5708, 0.0]
+                self.set_joint_positions(reject_pose)
                 self.set_gripper(open_pos=False)
                 self.set_gripper(open_pos=True)
-                cycle_time = time.time() - self.cycle_start_time
+                cycle_time = self.robot.getTime() - self.cycle_start_time
                 
                 self.log_cycle_to_csv(
                     self.current_detection["chocolate_type"],

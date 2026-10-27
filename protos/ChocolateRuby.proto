@@ -1,4 +1,4 @@
-#VRML_SIM R2023b utf8
+#VRML_SIM R2025a utf8
 # Modeled Ruby Chocolate Piece (Prism / Berry Hue)
 
 PROTO ChocolateRuby [
@@ -15,8 +15,8 @@ PROTO ChocolateRuby [
       Shape {
         appearance PBRAppearance {
           baseColor 0.72 0.28 0.45
-          roughness 0.3
-          metalness 0.05
+          roughness 0.8
+          metalness 0
         }
         geometry Box {
           size 0.038 0.030 0.020
@@ -27,7 +27,7 @@ PROTO ChocolateRuby [
       size 0.038 0.030 0.020
     }
     physics Physics {
-      density 1300
+      density -1
       mass 0.022
     }
   }
