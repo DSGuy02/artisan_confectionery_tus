@@ -4,12 +4,19 @@ Allows Partner 2 to test and validate computer vision algorithms offline without
 """
 
 import os
+import sys
 import cv2
 import numpy as np
+
+# Ensure local imports work regardless of current working directory
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
+
 from vision_pipeline import inspect_chocolate, draw_inspection_overlay
 
 
-def create_synthetic_test_images(output_dir="perception/sample_images"):
+def create_synthetic_test_images(output_dir):
     """Generates synthetic test images mimicking chocolates on the infeed table."""
     os.makedirs(output_dir, exist_ok=True)
     images = {}
@@ -38,11 +45,11 @@ def create_synthetic_test_images(output_dir="perception/sample_images"):
     cv2.fillPoly(img_ruby, [pts], (140, 70, 190))
     images["ruby_chocolate_normal.png"] = img_ruby
     
-    # 4. Chipped Defective Chocolate (Corner chipped out)
+    # 4. Chipped Defective Chocolate (Concave fracture/chip gouge on edge)
     img_chipped = np.full((480, 640, 3), 240, dtype=np.uint8)
     cv2.rectangle(img_chipped, (270, 190), (370, 290), (20, 30, 45), -1)
-    # Chip out a large triangular corner (simulates broken corner)
-    chip_pts = np.array([[330, 189], [371, 189], [371, 235]], np.int32)
+    # Carve a concave fracture notch into the side (reduces Area relative to Convex Hull)
+    chip_pts = np.array([[370, 200], [315, 240], [370, 280]], np.int32)
     cv2.fillPoly(img_chipped, [chip_pts], (240, 240, 240))  # Match background table
     images["dark_chocolate_chipped_defect.png"] = img_chipped
     
@@ -58,8 +65,8 @@ def run_offline_tests():
     print(" Running Offline Perception Tests for Artisan Confectionery Cell ")
     print("==================================================================")
     
-    samples_dir = "perception/sample_images"
-    results_dir = "perception/test_results"
+    samples_dir = os.path.join(CURRENT_DIR, "sample_images")
+    results_dir = os.path.join(CURRENT_DIR, "test_results")
     os.makedirs(results_dir, exist_ok=True)
     
     test_images = create_synthetic_test_images(samples_dir)

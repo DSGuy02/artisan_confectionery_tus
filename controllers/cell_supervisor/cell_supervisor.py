@@ -54,7 +54,7 @@ class ConfectioneryCellSupervisor:
         self.camera = self.robot.getDevice("camera")
         if self.camera:
             self.camera.enable(self.time_step)
-            print("[INFO] Overhead camera initialized and enabled.")
+            print("[INFO] Inspection camera initialized and enabled.")
         else:
             print("[WARNING] Camera device 'camera' not found in Webots world.")
 
@@ -87,17 +87,34 @@ class ConfectioneryCellSupervisor:
                 sensor.enable(self.time_step)
                 self.position_sensors.append(sensor)
 
-        # 4. Initialize Robotiq 2F-85 Gripper Actuators
-        self.finger_left = self.robot.getDevice("robotiq_85_left_knuckle_joint")
-        self.finger_right = self.robot.getDevice("robotiq_85_right_knuckle_joint")
+        # 4. Initialize Robotiq 2F-85 Gripper Actuators (Supports multiple PROTO naming conventions)
+        self.finger_left = self._find_first_device([
+            "robotiq_85_left_knuckle_joint",
+            "Robotiq 2F-85 Gripper::left finger joint",
+            "finger_1_joint_1"
+        ])
+        self.finger_right = self._find_first_device([
+            "robotiq_85_right_knuckle_joint",
+            "Robotiq 2F-85 Gripper::right finger joint",
+            "finger_2_joint_1"
+        ])
 
-        # 5. Telemetry & State Tracking
+        # 5. Telemetry & Non-Blocking State Tracking
         self.state = "IDLE"
+        self.wait_steps = 0
         self.cycle_id = 0
         self.cycle_start_time = 0.0
         self.current_detection = None
         self.csv_path = os.path.join(project_root, "data/production_metrics.csv")
         self._init_csv()
+
+    def _find_first_device(self, candidate_names):
+        """Returns the first matching Webots device from a list of candidate names."""
+        for name in candidate_names:
+            dev = self.robot.getDevice(name)
+            if dev is not None:
+                return dev
+        return None
 
     def _init_csv(self):
         """Initializes production metrics CSV if not present."""
@@ -111,10 +128,11 @@ class ConfectioneryCellSupervisor:
                 ])
 
     def set_gripper(self, open_pos=True):
-        """Actuates Robotiq gripper fingers: Open (0.0 rad) or Closed (0.85 rad)."""
-        target = 0.0 if open_pos else 0.85
-        if self.finger_left and self.finger_right:
+        """Actuates Robotiq gripper fingers: Open (0.0 rad) or Closed (0.80 rad)."""
+        target = 0.0 if open_pos else 0.80
+        if self.finger_left:
             self.finger_left.setPosition(target)
+        if self.finger_right:
             self.finger_right.setPosition(target)
 
     def set_joint_positions(self, target_joint_angles):
@@ -127,7 +145,7 @@ class ConfectioneryCellSupervisor:
         if self.touch_sensor:
             reading = self.touch_sensor.getValue()
             return reading > 0.05
-        # Simulated fallback for testing
+        # Simulated fallback for initial testing before physical contact tuning
         return True
 
     def log_cycle_to_csv(self, variety, angle, solidity, grip_force, cycle_time, case_type, status):
@@ -153,10 +171,16 @@ class ConfectioneryCellSupervisor:
         
         self.set_gripper(open_pos=True)
         self.set_joint_positions(HOME_POSE_JOINTS)
+        self.wait_steps = 40  # Allow robot to settle at home pose initially
 
         while self.robot.step(self.time_step) != -1:
+            # Non-blocking motion settle timer
+            if self.wait_steps > 0:
+                self.wait_steps -= 1
+                continue
+
             # ---------------------------------------------------------------
-            # FSM STATE 1: IDLE
+            # FSM STATE 1: IDLE (Wait for workpiece in camera FOV)
             # ---------------------------------------------------------------
             if self.state == "IDLE":
                 raw_bytes = self.camera.getImage() if self.camera else None
@@ -164,6 +188,7 @@ class ConfectioneryCellSupervisor:
                     bgr_frame = convert_webots_to_cv(raw_bytes, 
                                                     self.camera.getWidth(), 
                                                     self.camera.getHeight())
+                    # TODO (Partner 2): Tune min_contour_area & HSV masks for Webots lighting
                     detection = inspect_chocolate(bgr_frame)
                     
                     if detection.get("valid", False):
@@ -171,6 +196,7 @@ class ConfectioneryCellSupervisor:
                         self.cycle_id += 1
                         self.cycle_start_time = time.time()
                         self.state = "EVALUATE_QUALITY"
+                        self.wait_steps = 20
                         print(f"\n[CYCLE {self.cycle_id}] Workpiece Sensed on Infeed.")
                         print(f" -> Variety: {detection['chocolate_type']}")
                         print(f" -> Orientation Angle: {detection['orientation_deg']:+.1f} deg")
@@ -186,17 +212,19 @@ class ConfectioneryCellSupervisor:
                 else:
                     print("[QUALITY PASS] Surface intact. Proceeding to PICK_APPROACH.")
                     self.state = "PICK_APPROACH"
+                self.wait_steps = 20
 
             # ---------------------------------------------------------------
             # FSM STATE 3: PICK_APPROACH (Adaptive Wrist Orientation)
             # ---------------------------------------------------------------
             elif self.state == "PICK_APPROACH":
                 angle_deg = self.current_detection["orientation_deg"]
-                # Rotate wrist Joint 6 to align parallel to chocolate major axis
                 wrist_yaw = (angle_deg / 180.0) * 3.14159
-                pick_pose = [0.0, -1.5708, 1.5708, -1.5708, -1.5708, wrist_yaw]
+                # TODO (Partner 1): Replace placeholder joint angles with calibrated IK / pick waypoints
+                pick_pose = [0.0, -1.35, 1.65, -1.87, -1.5708, wrist_yaw]
                 self.set_joint_positions(pick_pose)
                 self.state = "GRASP_AND_VERIFY"
+                self.wait_steps = 60
 
             # ---------------------------------------------------------------
             # FSM STATE 4: GRASP_AND_VERIFY
@@ -209,6 +237,7 @@ class ConfectioneryCellSupervisor:
                 else:
                     print("[FAULT] Grip verification failed or dropped piece! Executing SAFE_RECOVERY.")
                     self.state = "SAFE_RECOVERY"
+                self.wait_steps = 40
 
             # ---------------------------------------------------------------
             # FSM STATE 5: TRANSFER_TRAY
@@ -218,7 +247,9 @@ class ConfectioneryCellSupervisor:
                 target_slot = get_slot_by_variety(variety)
                 slot_info = get_tray_slot_target(target_slot)
                 print(f"[TRANSFER] Routing to 2x2 Blister Tray {slot_info['name']}.")
+                # TODO (Partner 1): Command UR5e joints to target blister tray slot pose
                 self.state = "PLACE_AND_RELEASE"
+                self.wait_steps = 60
 
             # ---------------------------------------------------------------
             # FSM STATE 6: PLACE_AND_RELEASE
@@ -236,13 +267,15 @@ class ConfectioneryCellSupervisor:
                                      case_type, f"PACKED_SLOT_{get_slot_by_variety(variety)}")
                 
                 self.set_joint_positions(HOME_POSE_JOINTS)
-                self.state = "IDLE"
+                self.state = "CYCLE_COMPLETE"
+                self.wait_steps = 80
 
             # ---------------------------------------------------------------
             # FSM STATE 7: REJECT_ROUTINE (Scrap Remediation)
             # ---------------------------------------------------------------
             elif self.state == "REJECT_ROUTINE":
                 print("[REJECT] Transferring defective item to Gravity Remelt Chute.")
+                # TODO (Partner 1): Command UR5e joints to REJECT_CHUTE_TARGET
                 self.set_gripper(open_pos=False)
                 self.set_gripper(open_pos=True)
                 cycle_time = time.time() - self.cycle_start_time
@@ -255,7 +288,8 @@ class ConfectioneryCellSupervisor:
                 )
                 print("[SCRAP LOGGED] Defective piece deposited in remelt bin. Line ready.")
                 self.set_joint_positions(HOME_POSE_JOINTS)
-                self.state = "IDLE"
+                self.state = "CYCLE_COMPLETE"
+                self.wait_steps = 80
 
             # ---------------------------------------------------------------
             # FSM STATE 8: SAFE_RECOVERY
@@ -265,7 +299,15 @@ class ConfectioneryCellSupervisor:
                 self.set_gripper(open_pos=True)
                 self.set_joint_positions(HOME_POSE_JOINTS)
                 print("[SAFE] Fault cleared. Resuming automatic infeed monitoring.")
-                self.state = "IDLE"
+                self.state = "CYCLE_COMPLETE"
+                self.wait_steps = 80
+
+            # ---------------------------------------------------------------
+            # FSM STATE 9: CYCLE_COMPLETE (Wait for next workpiece trigger)
+            # ---------------------------------------------------------------
+            elif self.state == "CYCLE_COMPLETE":
+                # TODO (Partner 2): Add feeder handshake trigger before returning to IDLE
+                pass
 
 
 if __name__ == "__main__":

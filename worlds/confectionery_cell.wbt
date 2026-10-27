@@ -29,11 +29,12 @@ TexturedBackgroundLight {
 }
 
 Floor {
+  translation 0 0 -0.8
   size 4 4
   tileSize 1 1
 }
 
-# Main Industrial Pedestal Table
+# Main Industrial Pedestal Table (Top surface at Z = 0.0)
 Solid {
   translation 0 0 -0.4
   children [
@@ -74,16 +75,6 @@ Solid {
     height 0.04
     radius 0.12
   }
-}
-
-# Overhead Inspection Camera (Mounted 0.8m above table looking straight down)
-Camera {
-  translation 0 0.4 0.8
-  rotation 0 1 0 3.14159
-  name "camera"
-  fieldOfView 0.65
-  width 640
-  height 480
 }
 
 # 2x2 Blister Tray Presentation Fixture
@@ -154,10 +145,33 @@ Solid {
 }
 
 # Universal Robots UR5e Articulated Arm
+# Note for Partner 1: In Webots, all sensors (Camera, TouchSensor) controlled by
+# 'cell_supervisor' must reside inside the UR5e Robot node (e.g., in toolSlot, or
+# in the base children after right-clicking UR5e -> 'Convert to Base Nodes').
 UR5e {
   translation 0 0 0
   controller "cell_supervisor"
   supervisor TRUE
-  toolSlot Robotiq2f85 {
-  }
+  toolSlot [
+    Robotiq2f85 {
+    }
+    TouchSensor {
+      translation 0 0 0.14
+      name "touch_sensor"
+      boundingObject Sphere {
+        radius 0.012
+      }
+      physics Physics {
+        mass 0.01
+      }
+    }
+    Camera {
+      translation 0 0.05 0.05
+      rotation 0 1 0 -1.5708
+      name "camera"
+      fieldOfView 0.65
+      width 640
+      height 480
+    }
+  ]
 }

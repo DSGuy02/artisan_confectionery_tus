@@ -7,12 +7,19 @@ import os
 import csv
 import numpy as np
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 
-def generate_performance_plots(csv_path="data/production_metrics.csv", 
-                               output_plot_path="data/performance_plot.png"):
+
+def generate_performance_plots(csv_path=None, output_plot_path=None):
     """
     Parses production CSV telemetry and generates performance graphs.
     """
+    if csv_path is None:
+        csv_path = os.path.join(PROJECT_ROOT, "data/production_metrics.csv")
+    if output_plot_path is None:
+        output_plot_path = os.path.join(PROJECT_ROOT, "data/performance_plot.png")
+
     if not os.path.exists(csv_path):
         print(f"[ERROR] CSV metrics file not found at: {csv_path}")
         return False
@@ -77,7 +84,7 @@ def generate_performance_plots(csv_path="data/production_metrics.csv",
     # SUBPLOT 2: Solidity Distribution & Quality Threshold
     # -----------------------------------------------------------------------
     colors = ['#e74c3c' if s < 0.88 else '#27ae60' for s in solidities]
-    bars = ax2.bar(cycles, solidities, color=colors, edgecolor='#2c3e50', width=0.6)
+    ax2.bar(cycles, solidities, color=colors, edgecolor='#2c3e50', width=0.6)
 
     # Threshold line
     ax2.axhline(0.88, color='#c0392b', linestyle='--', linewidth=2, label='Quality Defect Threshold (0.88)')

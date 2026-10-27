@@ -82,11 +82,15 @@ def extract_orientation_and_centroid(contour):
         angle = raw_angle + 90.0
         width, height = height, width
         
-    # Standardize angle to [-90, +90]
+    # Standardize angle to (-90, +90]
     while angle > 90.0:
         angle -= 180.0
-    while angle < -90.0:
+    while angle <= -90.0:
         angle += 180.0
+        
+    # For nearly square contours at +/-90 deg, normalize to 0.0 deg
+    if abs(width - height) < 2.0 and abs(abs(angle) - 90.0) < 1.0:
+        angle = 0.0
         
     return (cx, cy), angle, (width, height)
 
