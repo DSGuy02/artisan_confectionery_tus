@@ -1,0 +1,36 @@
+#VRML_SIM R2023b utf8
+# Modeled Milk Chocolate Piece (Cylindrical / Rounded)
+
+PROTO ChocolateMilk [
+  field SFVec3f    translation 0 0 0
+  field SFRotation rotation    0 0 1 0
+  field SFString   name        "chocolate_milk"
+]
+{
+  Solid {
+    translation IS translation
+    rotation IS rotation
+    name IS name
+    children [
+      Shape {
+        appearance PBRAppearance {
+          baseColor 0.35 0.20 0.10
+          roughness 0.4
+          metalness 0.05
+        }
+        geometry Cylinder {
+          height 0.020
+          radius 0.018
+        }
+      }
+    ]
+    boundingObject Cylinder {
+      height 0.020
+      radius 0.018
+    }
+    physics Physics {
+      density 1300
+      mass 0.024
+    }
+  }
+}
