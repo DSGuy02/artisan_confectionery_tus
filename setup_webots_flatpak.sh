@@ -67,4 +67,9 @@ trap 'rm -rf "${STAGE}"' EXIT
 
 echo "[INFO] Verifying imports inside the Webots sandbox..."
 "${HOST[@]}" flatpak run --command=python3 "${APP_ID}" -c 'import numpy, cv2; print("  numpy", numpy.__version__, "| cv2", cv2.__version__)'
-echo "[SUCCESS] Webots Flatpak can now run the cell_supervisor controller."
+
+# Ensure HiDPI displays under Linux/Wayland render the full 3D viewport (prevents 1/4 viewport bug)
+echo "[INFO] Configuring HiDPI scaling override for Webots..."
+"${HOST[@]}" flatpak override --user --env=XDG_CURRENT_DESKTOP=MATE "${APP_ID}"
+
+echo "[SUCCESS] Webots Flatpak configured: dependencies installed and full-viewport rendering enabled."
