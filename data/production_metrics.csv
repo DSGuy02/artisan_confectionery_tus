@@ -9,3 +9,8 @@ Timestamp,CycleID,Variety,AngleDeg,Solidity,GripForceN,CycleTimeSec,CaseType,Sta
 1729330036.5,8,Ruby,3.4,0.955,0.18,4.1,Normal,PACKED_SLOT_3
 1729330041.8,9,Milk,-1.8,0.948,0.19,4.2,Normal,PACKED_SLOT_2
 1729330047.0,10,White,44.5,0.935,0.17,4.6,Boundary_Angle_45deg,PACKED_SLOT_4
+1793372163.57,1,Dark,45.0,1.0,0.18,3.86,Boundary_Angle_45deg,PACKED_SLOT_1
+1793372259.87,1,Dark,45.0,1.0,0.18,3.86,Boundary_Angle_45deg,PACKED_SLOT_1
+1793373169.59,1,Dark,45.0,1.0,0.18,3.86,Boundary_Angle_45deg,PACKED_SLOT_1
+1793373614.68,1,Dark,45.0,1.0,0.18,3.86,Boundary_Angle_45deg,PACKED_SLOT_1
+1793375153.04,1,Dark,45.0,1.0,0.18,3.86,Boundary_Angle_45deg,PACKED_SLOT_1

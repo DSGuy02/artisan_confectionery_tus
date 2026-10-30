@@ -124,7 +124,7 @@ Solid {
 }
 
 # Workpiece: Artisan Chocolate on Infeed Stage
-Solid {
+DEF CHOCOLATE_WORKPIECE Solid {
   translation 0 0.4 0.055
   rotation 0 0 1 0.785398 # 45 degrees rotation for boundary testing
   children [
@@ -176,15 +176,11 @@ CellUR5e {
   toolSlot [
     Robotiq2f85Gripper {
     }
-    TouchSensor {
-      translation 0 0 0.14
+    DEF TOUCH_SENSOR TouchSensor {
+      translation 0 0 0.125
       name "touch_sensor"
-      boundingObject Sphere {
-        radius 0.012
-      }
-      physics Physics {
-        density -1
-        mass 0.01
+      boundingObject Box {
+        size 0.02 0.02 0.006
       }
     }
   ]

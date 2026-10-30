@@ -222,8 +222,7 @@ class ConfectioneryCellSupervisor:
             elif self.state == "PICK_APPROACH":
                 angle_deg = self.current_detection["orientation_deg"]
                 wrist_yaw = (angle_deg / 180.0) * 3.14159
-                # TODO (Partner 1): Refine calibrated IK / pick waypoints for exact grasp height
-                pick_pose = [1.36, -1.32, 2.40, -2.65, -1.5708, wrist_yaw]
+                pick_pose = [1.1313, -1.1785, 1.9062, -0.7276, -1.2003, wrist_yaw]
                 self.set_joint_positions(pick_pose)
                 self.state = "GRASP_AND_VERIFY"
                 self.wait_steps = 60
@@ -232,6 +231,17 @@ class ConfectioneryCellSupervisor:
             # FSM STATE 4: GRASP_AND_VERIFY
             # ---------------------------------------------------------------
             elif self.state == "GRASP_AND_VERIFY":
+                ts_node = self.robot.getFromDef("TOUCH_SENSOR")
+                choc_node = self.robot.getFromDef("CHOCOLATE_WORKPIECE")
+                if ts_node:
+                    ts_pos = [round(v, 4) for v in ts_node.getPosition()]
+                    print(f"[DEBUG] TouchSensor position: {ts_pos}")
+                if choc_node:
+                    choc_pos = [round(v, 4) for v in choc_node.getPosition()]
+                    print(f"[DEBUG] Chocolate position:   {choc_pos}")
+                if self.touch_sensor:
+                    print(f"[DEBUG] TouchSensor raw value: {self.touch_sensor.getValue()}")
+
                 if not getattr(self, "gripper_closing_done", False):
                     self.set_gripper(open_pos=False)
                     self.gripper_closing_done = True
