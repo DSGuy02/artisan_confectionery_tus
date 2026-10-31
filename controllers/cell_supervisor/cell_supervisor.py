@@ -23,9 +23,17 @@ from perception.vision_pipeline import (
 )
 from motion.waypoints import (
     HOME_POSE_JOINTS,
+    STANDBY_POSE_JOINTS,
+    INFEED_APPROACH_JOINTS,
+    INFEED_PICK_JOINTS,
+    INFEED_RETRACT_JOINTS,
+    TRAY_SLOT_JOINTS,
+    REJECT_CHUTE_JOINTS,
+    SAFE_RETRACT_JOINTS,
     get_tray_slot_target,
     get_slot_by_variety,
-    REJECT_CHUTE_TARGET
+    get_tray_slot_joints,
+    compute_wrist_orientation
 )
 from motion.trajectory_planner import compute_adaptive_approach_pose
 
@@ -221,27 +229,28 @@ class ConfectioneryCellSupervisor:
             # ---------------------------------------------------------------
             elif self.state == "PICK_APPROACH":
                 angle_deg = self.current_detection["orientation_deg"]
-                wrist_yaw = (angle_deg / 180.0) * 3.14159
-                pick_pose = [1.1313, -1.1785, 1.9062, -0.7276, -1.2003, wrist_yaw]
-                self.set_joint_positions(pick_pose)
-                self.state = "GRASP_AND_VERIFY"
-                self.wait_steps = 60
+                wrist_yaw = compute_wrist_orientation(angle_deg)
+                
+                if not getattr(self, "pick_plunge_done", False):
+                    # Step A: Approach clearance (Z = 0.16m) with aligned wrist
+                    approach_pose = list(INFEED_APPROACH_JOINTS)
+                    approach_pose[5] = wrist_yaw
+                    self.set_joint_positions(approach_pose)
+                    self.pick_plunge_done = True
+                    self.wait_steps = 45
+                else:
+                    # Step B: Plunge descent to contact level (Z = 0.065m)
+                    self.pick_plunge_done = False
+                    pick_pose = list(INFEED_PICK_JOINTS)
+                    pick_pose[5] = wrist_yaw
+                    self.set_joint_positions(pick_pose)
+                    self.state = "GRASP_AND_VERIFY"
+                    self.wait_steps = 45
 
             # ---------------------------------------------------------------
             # FSM STATE 4: GRASP_AND_VERIFY
             # ---------------------------------------------------------------
             elif self.state == "GRASP_AND_VERIFY":
-                ts_node = self.robot.getFromDef("TOUCH_SENSOR")
-                choc_node = self.robot.getFromDef("CHOCOLATE_WORKPIECE")
-                if ts_node:
-                    ts_pos = [round(v, 4) for v in ts_node.getPosition()]
-                    print(f"[DEBUG] TouchSensor position: {ts_pos}")
-                if choc_node:
-                    choc_pos = [round(v, 4) for v in choc_node.getPosition()]
-                    print(f"[DEBUG] Chocolate position:   {choc_pos}")
-                if self.touch_sensor:
-                    print(f"[DEBUG] TouchSensor raw value: {self.touch_sensor.getValue()}")
-
                 if not getattr(self, "gripper_closing_done", False):
                     self.set_gripper(open_pos=False)
                     self.gripper_closing_done = True
@@ -250,78 +259,127 @@ class ConfectioneryCellSupervisor:
                     self.gripper_closing_done = False
                     if self.verify_grasp():
                         print("[GRIP CONFIRMED] Touch sensor validated positive contact.")
+                        # Vertical lift retract to clear infeed pedestal before lateral transit
+                        angle_deg = self.current_detection["orientation_deg"]
+                        wrist_yaw = compute_wrist_orientation(angle_deg)
+                        retract_pose = list(INFEED_RETRACT_JOINTS)
+                        retract_pose[5] = wrist_yaw
+                        self.set_joint_positions(retract_pose)
                         self.state = "TRANSFER_TRAY"
+                        self.wait_steps = 40
                     else:
                         print("[FAULT] Grip verification failed or dropped piece! Executing SAFE_RECOVERY.")
                         self.state = "SAFE_RECOVERY"
-                    self.wait_steps = 40
+                        self.wait_steps = 40
 
             # ---------------------------------------------------------------
-            # FSM STATE 5: TRANSFER_TRAY
+            # FSM STATE 5: TRANSFER_TRAY (Multi-Slot Cavity Routing)
             # ---------------------------------------------------------------
             elif self.state == "TRANSFER_TRAY":
                 variety = self.current_detection["chocolate_type"]
                 target_slot = get_slot_by_variety(variety)
                 slot_info = get_tray_slot_target(target_slot)
-                print(f"[TRANSFER] Routing to 2x2 Blister Tray {slot_info['name']}.")
-                # TODO (Partner 1): Calibrate per-slot IK joint angles from slot_info (X, Y, Z)
-                tray_pose = [0.25, -1.32, 2.40, -2.65, -1.5708, 0.0]
-                self.set_joint_positions(tray_pose)
+                print(f"[TRANSFER] Routing {variety} chocolate to 2x2 Blister Tray {slot_info['name']} (Cavity {target_slot}).")
+                
+                # Move to slot approach waypoint (clearing tray walls at Z = 0.16m, wrist squared to 0.0 rad)
+                slot_approach = get_tray_slot_joints(target_slot, "approach")
+                self.set_joint_positions(slot_approach)
                 self.state = "PLACE_AND_RELEASE"
-                self.wait_steps = 60
+                self.wait_steps = 55
 
             # ---------------------------------------------------------------
-            # FSM STATE 6: PLACE_AND_RELEASE
+            # FSM STATE 6: PLACE_AND_RELEASE (Plunge, Release, Retract)
             # ---------------------------------------------------------------
             elif self.state == "PLACE_AND_RELEASE":
-                self.set_gripper(open_pos=True)
-                cycle_time = self.robot.getTime() - self.cycle_start_time
                 variety = self.current_detection["chocolate_type"]
-                angle = self.current_detection["orientation_deg"]
-                solidity = self.current_detection["solidity"]
-                case_type = "Boundary_Angle_45deg" if abs(angle) > 30 else "Normal"
+                target_slot = get_slot_by_variety(variety)
+                step = getattr(self, "place_substep", 0)
                 
-                print(f"[SUCCESS] Packaged into tray. Elapsed: {cycle_time:.2f}s.")
-                self.log_cycle_to_csv(variety, angle, solidity, 0.18, cycle_time, 
-                                     case_type, f"PACKED_SLOT_{get_slot_by_variety(variety)}")
-                
-                self.set_joint_positions(HOME_POSE_JOINTS)
-                self.state = "CYCLE_COMPLETE"
-                self.wait_steps = 80
+                if step == 0:
+                    # Step 1: Plunge down into tray pocket (Z = 0.065m)
+                    slot_place = get_tray_slot_joints(target_slot, "place")
+                    self.set_joint_positions(slot_place)
+                    self.place_substep = 1
+                    self.wait_steps = 35
+                elif step == 1:
+                    # Step 2: Open gripper fingers to deposit workpiece
+                    self.set_gripper(open_pos=True)
+                    self.place_substep = 2
+                    self.wait_steps = 25
+                elif step == 2:
+                    # Step 3: Vertical retract to clearance height (Z = 0.20m)
+                    slot_retract = get_tray_slot_joints(target_slot, "retract")
+                    self.set_joint_positions(slot_retract)
+                    self.place_substep = 3
+                    self.wait_steps = 35
+                else:
+                    # Step 4: Return to home pose and log telemetry
+                    self.place_substep = 0
+                    cycle_time = self.robot.getTime() - self.cycle_start_time
+                    angle = self.current_detection["orientation_deg"]
+                    solidity = self.current_detection["solidity"]
+                    case_type = "Boundary_Angle_45deg" if abs(angle) > 30 else "Normal"
+                    
+                    print(f"[SUCCESS] Packaged into tray cavity {target_slot} ({variety}). Elapsed: {cycle_time:.2f}s.")
+                    self.log_cycle_to_csv(variety, angle, solidity, 0.18, cycle_time, 
+                                         case_type, f"PACKED_SLOT_{target_slot}")
+                    
+                    self.set_joint_positions(HOME_POSE_JOINTS)
+                    self.state = "CYCLE_COMPLETE"
+                    self.wait_steps = 50
 
             # ---------------------------------------------------------------
             # FSM STATE 7: REJECT_ROUTINE (Scrap Remediation)
             # ---------------------------------------------------------------
             elif self.state == "REJECT_ROUTINE":
                 print("[REJECT] Transferring defective item to Gravity Remelt Chute.")
-                # TODO (Partner 1): Calibrate exact UR5e joint angles for REJECT_CHUTE_TARGET
-                reject_pose = [2.20, -1.32, 2.40, -2.65, -1.5708, 0.0]
-                self.set_joint_positions(reject_pose)
-                self.set_gripper(open_pos=False)
-                self.set_gripper(open_pos=True)
-                cycle_time = self.robot.getTime() - self.cycle_start_time
+                rej_step = getattr(self, "reject_substep", 0)
                 
-                self.log_cycle_to_csv(
-                    self.current_detection["chocolate_type"],
-                    self.current_detection["orientation_deg"],
-                    self.current_detection["solidity"],
-                    0.0, cycle_time, "Fault_Chipped_Defect", "REJECTED_TO_CHUTE"
-                )
-                print("[SCRAP LOGGED] Defective piece deposited in remelt bin. Line ready.")
-                self.set_joint_positions(HOME_POSE_JOINTS)
-                self.state = "CYCLE_COMPLETE"
-                self.wait_steps = 80
+                if rej_step == 0:
+                    # Step 1: Move to chute approach
+                    self.set_joint_positions(REJECT_CHUTE_JOINTS["approach"])
+                    self.reject_substep = 1
+                    self.wait_steps = 45
+                elif rej_step == 1:
+                    # Step 2: Lower into chute deposit position
+                    self.set_joint_positions(REJECT_CHUTE_JOINTS["deposit"])
+                    self.reject_substep = 2
+                    self.wait_steps = 30
+                elif rej_step == 2:
+                    # Step 3: Open gripper to drop into chute
+                    self.set_gripper(open_pos=True)
+                    self.reject_substep = 3
+                    self.wait_steps = 25
+                elif rej_step == 3:
+                    # Step 4: Vertical retract
+                    self.set_joint_positions(REJECT_CHUTE_JOINTS["retract"])
+                    self.reject_substep = 4
+                    self.wait_steps = 30
+                else:
+                    self.reject_substep = 0
+                    cycle_time = self.robot.getTime() - self.cycle_start_time
+                    self.log_cycle_to_csv(
+                        self.current_detection["chocolate_type"],
+                        self.current_detection["orientation_deg"],
+                        self.current_detection["solidity"],
+                        0.0, cycle_time, "Fault_Chipped_Defect", "REJECTED_TO_CHUTE"
+                    )
+                    print("[SCRAP LOGGED] Defective piece deposited in remelt bin. Line ready.")
+                    self.set_joint_positions(HOME_POSE_JOINTS)
+                    self.state = "CYCLE_COMPLETE"
+                    self.wait_steps = 50
 
             # ---------------------------------------------------------------
             # FSM STATE 8: SAFE_RECOVERY
             # ---------------------------------------------------------------
             elif self.state == "SAFE_RECOVERY":
-                print("[RECOVERY] Executing emergency vertical retract to Z=0.25m.")
+                print("[RECOVERY] Executing emergency vertical retract to Z=0.20m clearance.")
                 self.set_gripper(open_pos=True)
+                self.set_joint_positions(SAFE_RETRACT_JOINTS)
                 self.set_joint_positions(HOME_POSE_JOINTS)
                 print("[SAFE] Fault cleared. Resuming automatic infeed monitoring.")
                 self.state = "CYCLE_COMPLETE"
-                self.wait_steps = 80
+                self.wait_steps = 60
 
             # ---------------------------------------------------------------
             # FSM STATE 9: CYCLE_COMPLETE (Wait for next workpiece trigger)
