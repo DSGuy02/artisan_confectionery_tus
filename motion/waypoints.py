@@ -155,19 +155,16 @@ SAFE_RETRACT_TARGET = [0.0, 0.40, Z_SAFE, 3.14159, 0.0, 0.0]
 def compute_wrist_orientation(orientation_deg, base_yaw=2.8000):
     """
     Converts vision-detected arrival angle theta (in degrees) to wrist_3_joint yaw angle.
-    Normalizes angle to [-pi/2, +pi/2] for optimal cable wrap, then offsets base_yaw.
+    A square chocolate has 4-fold symmetry (90-deg period), so orientation theta is
+    folded into [-pi/4, +pi/4]. Offsetting base_yaw keeps joint 6 rotation minimal
+    (at most +/- 0.785 rad from base_yaw) and avoids 360-degree reverse cable spins.
     """
     yaw_rad = np.radians(orientation_deg)
-    while yaw_rad > np.pi / 2.0:
-        yaw_rad -= np.pi
-    while yaw_rad < -np.pi / 2.0:
-        yaw_rad += np.pi
-    total_yaw = base_yaw + yaw_rad
-    while total_yaw > np.pi:
-        total_yaw -= 2.0 * np.pi
-    while total_yaw < -np.pi:
-        total_yaw += 2.0 * np.pi
-    return float(total_yaw)
+    while yaw_rad > np.pi / 4.0:
+        yaw_rad -= np.pi / 2.0
+    while yaw_rad < -np.pi / 4.0:
+        yaw_rad += np.pi / 2.0
+    return float(base_yaw + yaw_rad)
 
 
 def get_tray_slot_joints(slot_id, stage="place"):

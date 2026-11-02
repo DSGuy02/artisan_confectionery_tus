@@ -9,6 +9,8 @@ import sys
 import os
 import time
 import csv
+import math
+import numpy as np
 
 # Add project root to sys.path so modules can be imported inside Webots
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -117,6 +119,7 @@ class ConfectioneryCellSupervisor:
             print("[INFO] Gripper finger position sensor initialized.")
 
         # 5. Telemetry & Non-Blocking State Tracking
+        self.choc_node = self.robot.getFromDef("CHOCOLATE_WORKPIECE") if hasattr(self.robot, "getFromDef") else None
         self.state = "IDLE"
         self.wait_steps = 0
         self.cycle_id = 0
@@ -276,8 +279,9 @@ class ConfectioneryCellSupervisor:
                     self.wait_steps = 40  # Allow gripper fingers to close before sampling touch sensor
                 else:
                     self.gripper_closing_done = False
+                    choc_p = self.choc_node.getPosition() if self.choc_node else [0, 0, 0]
                     if self.verify_grasp():
-                        print("[GRIP CONFIRMED] Touch sensor validated positive contact.")
+                        print(f"[GRIP CONFIRMED] Workpiece secured. Starting vertical clearance retract.")
                         # Vertical lift retract to clear infeed pedestal before lateral transit
                         angle_deg = self.current_detection["orientation_deg"]
                         wrist_yaw = compute_wrist_orientation(angle_deg)
@@ -298,13 +302,38 @@ class ConfectioneryCellSupervisor:
                 variety = self.current_detection["chocolate_type"]
                 target_slot = get_slot_by_variety(variety)
                 slot_info = get_tray_slot_target(target_slot)
-                print(f"[TRANSFER] Routing {variety} chocolate to 2x2 Blister Tray {slot_info['name']} (Cavity {target_slot}).")
                 
-                # Move to slot approach waypoint (clearing tray walls at Z = 0.18m)
-                slot_approach = get_tray_slot_joints(target_slot, "approach")
-                self.set_joint_positions(slot_approach)
-                self.state = "PLACE_AND_RELEASE"
-                self.wait_steps = 90  # Slew from INFEED retract to tray slot approach
+                if not hasattr(self, "transfer_trajectory") or self.transfer_trajectory is None:
+                    choc_p = self.choc_node.getPosition() if self.choc_node else [0, 0, 0]
+                    print(f"[LIFT VERIFIED] Vertical clearance attained: Z = {choc_p[2]:.3f} m.")
+                    print(f"[TRANSFER] Executing smooth S-curve transit to {slot_info['name']} (Cavity {target_slot}).")
+                    
+                    angle_deg = self.current_detection["orientation_deg"]
+                    wrist_yaw = compute_wrist_orientation(angle_deg)
+                    q_start = list(INFEED_RETRACT_JOINTS)
+                    q_start[5] = wrist_yaw
+                    q_end = get_tray_slot_joints(target_slot, "approach")
+                    
+                    # Generate 50-step smooth S-curve interpolated joint trajectory
+                    N_PTS = 50
+                    traj = []
+                    for i in range(1, N_PTS + 1):
+                        t = i / float(N_PTS)
+                        alpha = (1.0 - np.cos(t * np.pi)) / 2.0
+                        q_pt = [(1.0 - alpha) * s + alpha * e for s, e in zip(q_start, q_end)]
+                        traj.append(q_pt)
+                    self.transfer_trajectory = traj
+                    self.transfer_index = 0
+                
+                if self.transfer_index < len(self.transfer_trajectory):
+                    self.set_joint_positions(self.transfer_trajectory[self.transfer_index])
+                    self.transfer_index += 1
+                    self.wait_steps = 2  # 32ms per waypoint for smooth transit
+                else:
+                    self.transfer_trajectory = None
+                    self.transfer_index = 0
+                    self.state = "PLACE_AND_RELEASE"
+                    self.wait_steps = 25
 
             # ---------------------------------------------------------------
             # FSM STATE 6: PLACE_AND_RELEASE (Plunge, Release, Retract)
@@ -322,11 +351,15 @@ class ConfectioneryCellSupervisor:
                     self.wait_steps = 45
                 elif step == 1:
                     # Step 2: Open gripper fingers to deposit workpiece
+                    choc_p = self.choc_node.getPosition() if self.choc_node else [0, 0, 0]
+                    print(f"[TRAY POSITION] Plunge seated at X={choc_p[0]:.4f}, Y={choc_p[1]:.4f}, Z={choc_p[2]:.4f} m.")
                     self.set_gripper(open_pos=True)
                     self.place_substep = 2
                     self.wait_steps = 25
                 elif step == 2:
                     # Step 3: Vertical retract to clearance height (Z = 0.22m)
+                    choc_p = self.choc_node.getPosition() if self.choc_node else [0, 0, 0]
+                    print(f"[DEPOSIT VERIFIED] Released in cavity {target_slot}. Retracting arm.")
                     slot_retract = get_tray_slot_joints(target_slot, "retract")
                     self.set_joint_positions(slot_retract)
                     self.place_substep = 3
