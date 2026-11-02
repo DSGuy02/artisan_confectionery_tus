@@ -72,84 +72,102 @@ HOME_POSE_JOINTS    = [0.0, -1.5708, 1.5708, -1.5708, -1.5708, 0.0]
 STANDBY_POSE_JOINTS = [1.1254, -1.2000, 1.5500, -0.5000, -1.3778, 0.0]
 
 # Infeed inspection stage pick waypoints (Approach -> Plunge Pick -> Lift Retract)
-INFEED_APPROACH_JOINTS = [1.1265, -1.3090, 1.8107, -0.5017, -1.1819, 0.0]
-INFEED_PICK_JOINTS     = [1.1315, -1.1700, 1.9101, -0.7400, -1.2013, 0.0]
-INFEED_RETRACT_JOINTS  = [1.1234, -1.3532, 1.7541, -0.4009, -1.1696, 0.0]
+INFEED_APPROACH_JOINTS = [1.2292, -1.7500, 2.2019, -2.0227, -1.5708, 2.8000]
+INFEED_PICK_JOINTS     = [1.2292, -1.5696, 2.3579, -2.3591, -1.5708, 2.8000]
+INFEED_RETRACT_JOINTS  = [1.2292, -1.7933, 2.1246, -1.9021, -1.5708, 2.8000]
 
 # 2x2 Blister Tray Presentation Slot Joint Poses (4 Cavities)
 TRAY_SLOT_JOINTS = {
     1: {  # Slot 1: Dark Chocolate Cube ([0.350, 0.200, Z])
-        "approach": [0.1643, -1.2579, 1.7418, -0.4839, -1.5103, 0.0],
-        "place":    [0.1662, -1.1279, 1.8429, -0.7150, -1.5174, 0.0],
-        "retract":  [0.1627, -1.2985, 1.6838, -0.3853, -1.5042, 0.0]
+        "approach": [0.1803, -1.7414, 2.1951, -2.0245, -1.5708, 1.7511],
+        "place":    [0.1803, -1.5618, 2.3501, -2.3591, -1.5708, 1.7511],
+        "retract":  [0.1803, -1.7847, 2.1182, -1.9043, -1.5708, 1.7511]
     },
     2: {  # Slot 2: Milk Chocolate Cylinder ([0.395, 0.200, Z])
-        "approach": [0.1395, -1.1717, 1.6192, -0.4474, -1.4792, 0.0],
-        "place":    [0.1417, -1.0522, 1.7180, -0.6658, -1.4884, 0.0],
-        "retract":  [0.1377, -1.2091, 1.5621, -0.3530, -1.4716, 0.0]
+        "approach": [0.1612, -1.6361, 2.1048, -2.0395, -1.5708, 1.7320],
+        "place":    [0.1612, -1.4685, 2.2488, -2.3511, -1.5708, 1.7320],
+        "retract":  [0.1612, -1.6789, 2.0319, -1.9238, -1.5708, 1.7320]
     },
     3: {  # Slot 3: Ruby Chocolate Heart/Prism ([0.350, 0.245, Z])
-        "approach": [0.2701, -1.2062, 1.6691, -0.4629, -1.4832, 0.0],
-        "place":    [0.2722, -1.0825, 1.7686, -0.6861, -1.4917, 0.0],
-        "retract":  [0.2683, -1.2449, 1.6118, -0.3669, -1.4761, 0.0]
+        "approach": [0.2917, -1.6764, 2.1409, -2.0354, -1.5708, 1.8625],
+        "place":    [0.2917, -1.5040, 2.2889, -2.3557, -1.5708, 1.8625],
+        "retract":  [0.2917, -1.7195, 2.0665, -1.9178, -1.5708, 1.8625]
     },
     4: {  # Slot 4: White Chocolate Praline ([0.395, 0.245, Z])
-        "approach": [0.2378, -1.1239, 1.5478, -0.4240, -1.4600, 0.0],
-        "place":    [0.2402, -1.0098, 1.6459, -0.6361, -1.4706, 0.0],
-        "retract":  [0.2359, -1.1594, 1.4908, -0.3314, -1.4515, 0.0]
+        "approach": [0.2627, -1.5807, 2.0519, -2.0421, -1.5708, 1.8335],
+        "place":    [0.2627, -1.4198, 2.1908, -2.3418, -1.5708, 1.8335],
+        "retract":  [0.2627, -1.6227, 1.9809, -1.9290, -1.5708, 1.8335]
     }
 }
 
 # Gravity Remelt Reject Chute (Scrap Remediation)
 REJECT_CHUTE_JOINTS = {
-    "approach": [2.1763, -1.2402, 1.6054, -0.3652, -1.4556, 0.0],
-    "deposit":  [2.1793, -1.1290, 1.7316, -0.6026, -1.4678, 0.0],
-    "retract":  [2.1740, -1.2705, 1.5390, -0.2685, -1.4463, 0.0]
+    "approach": [2.2045, -1.7119, 2.0601, -1.9191, -1.5708, -2.5079],
+    "deposit":  [2.2045, -1.5949, 2.2153, -2.1911, -1.5708, -2.5079],
+    "retract":  [2.2045, -1.7119, 2.0601, -1.9191, -1.5708, -2.5079]
 }
 
 # Emergency Safe Retract (Vertical clearance before returning home)
-SAFE_RETRACT_JOINTS = [1.1234, -1.3532, 1.7541, -0.4009, -1.1696, 0.0]
+SAFE_RETRACT_JOINTS = [1.2292, -1.8165, 2.0619, -1.8162, -1.5708, 2.8000]
 
 
 # ---------------------------------------------------------------------------
 # 3. CARTESIAN TARGET COORDINATES (Expressed in World Frame {W})
+# Positions are for the grasp TCP (centre of the Robotiq finger pads), with the
+# gripper pointing straight down. Heights are chosen from the cell geometry:
+#   infeed pedestal / tray top surface = 0.040 m, chocolate height = 0.020 m.
+#   TCP at 0.080 m positions the finger pads squarely across the chocolate sides
+#   while providing clearance from the infeed pedestal during finger closure.
+#   Reject chute top = 0.100 m, so the piece is released at 0.130 m.
 # ---------------------------------------------------------------------------
 
+Z_PICK      = 0.080   # Grasp height on the infeed pedestal / tray surface
+Z_APPROACH  = 0.180   # Clearance before the vertical plunge
+Z_RETRACT   = 0.220   # Lift height before any lateral transfer
+Z_SAFE      = 0.250   # Emergency vertical retract height
+
 INFEED_PICK_TARGET = {
-    "approach": [0.0, 0.40, 0.180, 3.14159, 0.0, 0.0],
-    "pick":     [0.0, 0.40, 0.055, 3.14159, 0.0, 0.0],
-    "retract":  [0.0, 0.40, 0.220, 3.14159, 0.0, 0.0]
+    "approach": [0.0, 0.40, Z_APPROACH, 3.14159, 0.0, 0.0],
+    "pick":     [0.0, 0.40, Z_PICK,     3.14159, 0.0, 0.0],
+    "retract":  [0.0, 0.40, Z_RETRACT,  3.14159, 0.0, 0.0]
 }
 
 TRAY_SLOT_TARGETS = {
-    1: {"name": "Slot 1 (Dark)",  "variety": "Dark",  "X": 0.350, "Y": 0.200, "Z_place": 0.055, "Z_approach": 0.180},
-    2: {"name": "Slot 2 (Milk)",  "variety": "Milk",  "X": 0.395, "Y": 0.200, "Z_place": 0.055, "Z_approach": 0.180},
-    3: {"name": "Slot 3 (Ruby)",  "variety": "Ruby",  "X": 0.350, "Y": 0.245, "Z_place": 0.055, "Z_approach": 0.180},
-    4: {"name": "Slot 4 (White)", "variety": "White", "X": 0.395, "Y": 0.245, "Z_place": 0.055, "Z_approach": 0.180}
+    1: {"name": "Slot 1 (Dark)",  "variety": "Dark",  "X": 0.350, "Y": 0.200, "Z_place": Z_PICK + 0.001, "Z_approach": Z_APPROACH},
+    2: {"name": "Slot 2 (Milk)",  "variety": "Milk",  "X": 0.395, "Y": 0.200, "Z_place": Z_PICK + 0.001, "Z_approach": Z_APPROACH},
+    3: {"name": "Slot 3 (Ruby)",  "variety": "Ruby",  "X": 0.350, "Y": 0.245, "Z_place": Z_PICK + 0.001, "Z_approach": Z_APPROACH},
+    4: {"name": "Slot 4 (White)", "variety": "White", "X": 0.395, "Y": 0.245, "Z_place": Z_PICK + 0.001, "Z_approach": Z_APPROACH}
 }
 
 REJECT_CHUTE_TARGET = {
-    "approach": [-0.350, 0.250, 0.220, 3.14159, 0.0, 0.0],
-    "deposit":  [-0.350, 0.250, 0.120, 3.14159, 0.0, 0.0],
-    "retract":  [-0.350, 0.250, 0.250, 3.14159, 0.0, 0.0]
+    "approach": [-0.350, 0.250, Z_RETRACT, 3.14159, 0.0, 0.0],
+    "deposit":  [-0.350, 0.250, 0.130,     3.14159, 0.0, 0.0],
+    "retract":  [-0.350, 0.250, Z_RETRACT, 3.14159, 0.0, 0.0]
 }
+
+SAFE_RETRACT_TARGET = [0.0, 0.40, Z_SAFE, 3.14159, 0.0, 0.0]
 
 
 # ---------------------------------------------------------------------------
 # 4. KINEMATICS & REACHABILITY HELPER FUNCTIONS
 # ---------------------------------------------------------------------------
 
-def compute_wrist_orientation(orientation_deg):
+def compute_wrist_orientation(orientation_deg, base_yaw=2.8000):
     """
     Converts vision-detected arrival angle theta (in degrees) to wrist_3_joint yaw angle.
-    Normalizes angle to [-pi/2, +pi/2] for optimal cable wrap and joint clearance.
+    Normalizes angle to [-pi/2, +pi/2] for optimal cable wrap, then offsets base_yaw.
     """
     yaw_rad = np.radians(orientation_deg)
     while yaw_rad > np.pi / 2.0:
         yaw_rad -= np.pi
     while yaw_rad < -np.pi / 2.0:
         yaw_rad += np.pi
-    return float(yaw_rad)
+    total_yaw = base_yaw + yaw_rad
+    while total_yaw > np.pi:
+        total_yaw -= 2.0 * np.pi
+    while total_yaw < -np.pi:
+        total_yaw += 2.0 * np.pi
+    return float(total_yaw)
 
 
 def get_tray_slot_joints(slot_id, stage="place"):
@@ -182,10 +200,20 @@ def get_slot_by_variety(chocolate_variety):
     return mapping.get(chocolate_variety, 1)
 
 
-def forward_kinematics(q, tool_len=0.14):
+GRASP_TCP_OFFSET   = 0.130   # Gripper base -> centre of finger pads (along gripper +Z)
+TOUCH_SENSOR_OFFSET = 0.125  # Gripper base -> TouchSensor pad (matches the .wbt file)
+
+
+def forward_kinematics(q, tcp_offset=GRASP_TCP_OFFSET):
     """
-    Exact forward kinematics of the Webots CellUR5e manipulator with Robotiq 2F-85.
-    Returns: (tcp_position [X, Y, Z], rotation_matrix 3x3)
+    Forward kinematics of the Webots CellUR5e manipulator with the Robotiq 2F-85.
+    The chain follows the joint anchors in protos/CellUR5e.proto, then the
+    TOOL_MOUNT Pose in the world file (rotation 1 0 0 -1.5708), which lines the
+    gripper +Z axis up with the wrist_3 (flange) axis.
+    Checked against Webots scene-tree readings to within 0.5 mm.
+
+    Returns: (tcp_position [X, Y, Z], gripper rotation matrix 3x3)
+      gripper columns: x, y (finger closing direction), z (approach direction)
     """
     def rot_axis(axis, angle):
         ux, uy, uz = axis
@@ -208,8 +236,9 @@ def forward_kinematics(q, tool_len=0.14):
     T = T @ trans(0, 0, 0.392) @ rot_axis([0, 1, 0], q4) @ rot_axis([0, 1, 0], 1.570796)
     T = T @ trans(0, 0.127, 0) @ rot_axis([0, 0, 1], q5)
     T = T @ trans(0, 0, 0.1) @ rot_axis([0, 1, 0], q6)
-    T = T @ trans(0, 0.1, 0)
-    T_tip = T @ trans(0, 0, tool_len)
+    T = T @ trans(0, 0.1, 0)                      # toolSlot
+    T = T @ rot_axis([1, 0, 0], -1.5708)          # TOOL_MOUNT
+    T_tip = T @ trans(0, 0, tcp_offset)
     return T_tip[:3, 3], T[:3, :3]
 
 

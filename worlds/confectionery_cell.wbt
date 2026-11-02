@@ -15,6 +15,17 @@ WorldInfo {
   title "Artisan Confectionery Packaging Cell"
   basicTimeStep 16
   coordinateSystem "ENU"
+  contactProperties [
+    ContactProperties {
+      material1 "ROBOTIQ gripper pad"
+      material2 "default"
+      coulombFriction [
+        10.0
+      ]
+      bounce 0
+      bounceVelocity 0.01
+    }
+  ]
 }
 
 Viewpoint {
@@ -174,14 +185,22 @@ CellUR5e {
     }
   ]
   toolSlot [
-    Robotiq2f85Gripper {
-    }
-    DEF TOUCH_SENSOR TouchSensor {
-      translation 0 0 0.125
-      name "touch_sensor"
-      boundingObject Box {
-        size 0.02 0.02 0.006
-      }
+    # The UR5e toolSlot frame has its Z axis perpendicular to the flange, while the
+    # Robotiq 2F-85 extends along its own +Z. Rotating -90 deg about X lines the
+    # gripper up with the flange (wrist_3) axis so wrist_3 spins the gripper in place.
+    DEF TOOL_MOUNT Pose {
+      rotation 1 0 0 -1.5708
+      children [
+        Robotiq2f85Gripper {
+        }
+        DEF TOUCH_SENSOR TouchSensor {
+          translation 0 0 0.147
+          name "touch_sensor"
+          boundingObject Box {
+            size 0.02 0.02 0.006
+          }
+        }
+      ]
     }
   ]
 }

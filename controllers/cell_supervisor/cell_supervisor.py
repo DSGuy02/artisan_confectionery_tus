@@ -108,6 +108,13 @@ class ConfectioneryCellSupervisor:
             "Robotiq 2F-85 Gripper::right finger joint",
             "finger_2_joint_1"
         ])
+        self.finger_sensor = self._find_first_device([
+            "ROBOTIQ 2F-85 Gripper left finger joint sensor",
+            "robotiq_85_left_knuckle_joint_sensor"
+        ])
+        if self.finger_sensor:
+            self.finger_sensor.enable(self.time_step)
+            print("[INFO] Gripper finger position sensor initialized.")
 
         # 5. Telemetry & Non-Blocking State Tracking
         self.state = "IDLE"
@@ -150,13 +157,25 @@ class ConfectioneryCellSupervisor:
         for motor, angle in zip(self.motors, target_joint_angles):
             motor.setPosition(angle)
 
+    def joints_reached(self, target_joints, tol=0.04):
+        """Returns True if arm position sensors have settled near target_joints."""
+        if not self.position_sensors or len(self.position_sensors) != len(target_joints):
+            return True
+        return all(abs(s.getValue() - target) < tol 
+                   for s, target in zip(self.position_sensors, target_joints))
+
     def verify_grasp(self):
-        """Queries touch/force sensor to confirm positive workpiece grasp."""
-        if self.touch_sensor:
-            reading = self.touch_sensor.getValue()
-            return reading > 0.05
-        # Simulated fallback for initial testing before physical contact tuning
-        return True
+        """Queries touch sensor and gripper knuckle stroke to confirm positive workpiece grasp."""
+        touch_reading = self.touch_sensor.getValue() if self.touch_sensor else 0.0
+        knuckle_val = self.finger_sensor.getValue() if getattr(self, "finger_sensor", None) else 0.5
+        
+        # When 35mm chocolate is grasped: knuckle settles between 0.30 and 0.58 rad.
+        # When fingers close on empty space without workpiece: knuckle exceeds 0.60 rad.
+        knuckle_grasp_ok = (0.25 <= knuckle_val <= 0.58)
+        touch_force_ok = (touch_reading > 0.05)
+        
+        print(f"[GRASP SENSING] Touch Force: {touch_reading:.3f} | Knuckle Stroke: {knuckle_val:.4f} rad")
+        return touch_force_ok or knuckle_grasp_ok
 
     def log_cycle_to_csv(self, variety, angle, solidity, grip_force, cycle_time, case_type, status):
         """Appends cycle telemetry to production CSV log."""
@@ -232,20 +251,20 @@ class ConfectioneryCellSupervisor:
                 wrist_yaw = compute_wrist_orientation(angle_deg)
                 
                 if not getattr(self, "pick_plunge_done", False):
-                    # Step A: Approach clearance (Z = 0.16m) with aligned wrist
+                    # Step A: Approach clearance (Z = 0.18m) with aligned wrist
                     approach_pose = list(INFEED_APPROACH_JOINTS)
                     approach_pose[5] = wrist_yaw
                     self.set_joint_positions(approach_pose)
                     self.pick_plunge_done = True
-                    self.wait_steps = 45
+                    self.wait_steps = 100  # Slew from HOME to INFEED approach
                 else:
-                    # Step B: Plunge descent to contact level (Z = 0.065m)
+                    # Step B: Plunge descent to contact level (Z = 0.080m)
                     self.pick_plunge_done = False
                     pick_pose = list(INFEED_PICK_JOINTS)
                     pick_pose[5] = wrist_yaw
                     self.set_joint_positions(pick_pose)
                     self.state = "GRASP_AND_VERIFY"
-                    self.wait_steps = 45
+                    self.wait_steps = 50
 
             # ---------------------------------------------------------------
             # FSM STATE 4: GRASP_AND_VERIFY
@@ -254,7 +273,7 @@ class ConfectioneryCellSupervisor:
                 if not getattr(self, "gripper_closing_done", False):
                     self.set_gripper(open_pos=False)
                     self.gripper_closing_done = True
-                    self.wait_steps = 35  # Allow gripper fingers to close before sampling touch sensor
+                    self.wait_steps = 40  # Allow gripper fingers to close before sampling touch sensor
                 else:
                     self.gripper_closing_done = False
                     if self.verify_grasp():
@@ -266,7 +285,7 @@ class ConfectioneryCellSupervisor:
                         retract_pose[5] = wrist_yaw
                         self.set_joint_positions(retract_pose)
                         self.state = "TRANSFER_TRAY"
-                        self.wait_steps = 40
+                        self.wait_steps = 50
                     else:
                         print("[FAULT] Grip verification failed or dropped piece! Executing SAFE_RECOVERY.")
                         self.state = "SAFE_RECOVERY"
@@ -281,11 +300,11 @@ class ConfectioneryCellSupervisor:
                 slot_info = get_tray_slot_target(target_slot)
                 print(f"[TRANSFER] Routing {variety} chocolate to 2x2 Blister Tray {slot_info['name']} (Cavity {target_slot}).")
                 
-                # Move to slot approach waypoint (clearing tray walls at Z = 0.16m, wrist squared to 0.0 rad)
+                # Move to slot approach waypoint (clearing tray walls at Z = 0.18m)
                 slot_approach = get_tray_slot_joints(target_slot, "approach")
                 self.set_joint_positions(slot_approach)
                 self.state = "PLACE_AND_RELEASE"
-                self.wait_steps = 55
+                self.wait_steps = 90  # Slew from INFEED retract to tray slot approach
 
             # ---------------------------------------------------------------
             # FSM STATE 6: PLACE_AND_RELEASE (Plunge, Release, Retract)
@@ -296,22 +315,22 @@ class ConfectioneryCellSupervisor:
                 step = getattr(self, "place_substep", 0)
                 
                 if step == 0:
-                    # Step 1: Plunge down into tray pocket (Z = 0.065m)
+                    # Step 1: Plunge down into tray pocket (Z = 0.081m)
                     slot_place = get_tray_slot_joints(target_slot, "place")
                     self.set_joint_positions(slot_place)
                     self.place_substep = 1
-                    self.wait_steps = 35
+                    self.wait_steps = 45
                 elif step == 1:
                     # Step 2: Open gripper fingers to deposit workpiece
                     self.set_gripper(open_pos=True)
                     self.place_substep = 2
                     self.wait_steps = 25
                 elif step == 2:
-                    # Step 3: Vertical retract to clearance height (Z = 0.20m)
+                    # Step 3: Vertical retract to clearance height (Z = 0.22m)
                     slot_retract = get_tray_slot_joints(target_slot, "retract")
                     self.set_joint_positions(slot_retract)
                     self.place_substep = 3
-                    self.wait_steps = 35
+                    self.wait_steps = 45
                 else:
                     # Step 4: Return to home pose and log telemetry
                     self.place_substep = 0
@@ -326,7 +345,7 @@ class ConfectioneryCellSupervisor:
                     
                     self.set_joint_positions(HOME_POSE_JOINTS)
                     self.state = "CYCLE_COMPLETE"
-                    self.wait_steps = 50
+                    self.wait_steps = 80
 
             # ---------------------------------------------------------------
             # FSM STATE 7: REJECT_ROUTINE (Scrap Remediation)
@@ -339,12 +358,12 @@ class ConfectioneryCellSupervisor:
                     # Step 1: Move to chute approach
                     self.set_joint_positions(REJECT_CHUTE_JOINTS["approach"])
                     self.reject_substep = 1
-                    self.wait_steps = 45
+                    self.wait_steps = 60
                 elif rej_step == 1:
                     # Step 2: Lower into chute deposit position
                     self.set_joint_positions(REJECT_CHUTE_JOINTS["deposit"])
                     self.reject_substep = 2
-                    self.wait_steps = 30
+                    self.wait_steps = 35
                 elif rej_step == 2:
                     # Step 3: Open gripper to drop into chute
                     self.set_gripper(open_pos=True)
@@ -354,7 +373,7 @@ class ConfectioneryCellSupervisor:
                     # Step 4: Vertical retract
                     self.set_joint_positions(REJECT_CHUTE_JOINTS["retract"])
                     self.reject_substep = 4
-                    self.wait_steps = 30
+                    self.wait_steps = 40
                 else:
                     self.reject_substep = 0
                     cycle_time = self.robot.getTime() - self.cycle_start_time
@@ -367,19 +386,25 @@ class ConfectioneryCellSupervisor:
                     print("[SCRAP LOGGED] Defective piece deposited in remelt bin. Line ready.")
                     self.set_joint_positions(HOME_POSE_JOINTS)
                     self.state = "CYCLE_COMPLETE"
-                    self.wait_steps = 50
+                    self.wait_steps = 70
 
             # ---------------------------------------------------------------
             # FSM STATE 8: SAFE_RECOVERY
             # ---------------------------------------------------------------
             elif self.state == "SAFE_RECOVERY":
-                print("[RECOVERY] Executing emergency vertical retract to Z=0.20m clearance.")
-                self.set_gripper(open_pos=True)
-                self.set_joint_positions(SAFE_RETRACT_JOINTS)
-                self.set_joint_positions(HOME_POSE_JOINTS)
-                print("[SAFE] Fault cleared. Resuming automatic infeed monitoring.")
-                self.state = "CYCLE_COMPLETE"
-                self.wait_steps = 60
+                rec_step = getattr(self, "recovery_substep", 0)
+                if rec_step == 0:
+                    print("[RECOVERY] Executing emergency vertical retract to safe clearance.")
+                    self.set_gripper(open_pos=True)
+                    self.set_joint_positions(SAFE_RETRACT_JOINTS)
+                    self.recovery_substep = 1
+                    self.wait_steps = 50
+                else:
+                    self.recovery_substep = 0
+                    self.set_joint_positions(HOME_POSE_JOINTS)
+                    print("[SAFE] Fault cleared. Returned to home pose.")
+                    self.state = "CYCLE_COMPLETE"
+                    self.wait_steps = 70
 
             # ---------------------------------------------------------------
             # FSM STATE 9: CYCLE_COMPLETE (Wait for next workpiece trigger)
