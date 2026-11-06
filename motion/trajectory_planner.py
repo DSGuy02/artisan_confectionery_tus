@@ -63,3 +63,43 @@ def generate_cartesian_trajectory(start_pos, end_pos, num_steps=20, s_curve=True
         waypoints.append(point.tolist())
         
     return waypoints
+
+
+def generate_joint_s_curve_trajectory(q_start, q_end, num_steps=50):
+    """
+    Generates a smoothly interpolated 6-DOF joint trajectory between two configurations
+    using a cosine S-curve (raised cosine) ramping profile:
+        alpha(t) = (1.0 - cos(pi * t)) / 2.0
+    
+    The S-curve velocity profile ensures zero velocity and zero acceleration at both
+    endpoints, mitigating inertial jerk forces that would otherwise destabilise friction
+    grasps during high-speed lateral transfers across the workcell.
+    
+    For wrist_3 (joint 5) with multi-turn limits, shortest-path angular unwrapping is applied
+    to prevent reverse rotation greater than 180 degrees while transporting chocolates.
+    
+    Args:
+        q_start (list or np.ndarray): Starting 6-DOF joint angles in radians.
+        q_end (list or np.ndarray): Target 6-DOF joint angles in radians.
+        num_steps (int): Number of intermediate interpolation steps (default: 50).
+        
+    Returns:
+        list of list of float: Sequence of 6-DOF joint angle arrays.
+    """
+    start = np.asarray(q_start, dtype=float)
+    end = np.asarray(q_end, dtype=float).copy()
+    
+    # Ensure shortest-path angular rotation on continuous / multi-turn wrist_3 (joint 5)
+    if len(start) > 5 and len(end) > 5:
+        diff_wrist = (end[5] - start[5] + np.pi) % (2.0 * np.pi) - np.pi
+        end[5] = start[5] + diff_wrist
+
+    trajectory = []
+    for i in range(1, num_steps + 1):
+        t = i / float(num_steps)
+        alpha = (1.0 - np.cos(t * np.pi)) / 2.0
+        q_interp = (1.0 - alpha) * start + alpha * end
+        trajectory.append([round(float(val), 5) for val in q_interp])
+        
+    return trajectory
+

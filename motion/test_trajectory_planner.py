@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""
+test_trajectory_planner.py - Unit tests for trajectory generation & S-curve motion profiling.
+Technological University of the Shannon (TUS Athlone)
+Integrated Robotics 4 - Continuous Assessment 3
+"""
+
+import sys
+import os
+import unittest
+import numpy as np
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from motion.trajectory_planner import (
+    generate_joint_s_curve_trajectory,
+    generate_cartesian_trajectory,
+    compute_adaptive_approach_pose
+)
+from motion.waypoints import (
+    INFEED_RETRACT_JOINTS,
+    TRAY_SLOT_JOINTS,
+    REJECT_CHUTE_JOINTS
+)
+
+
+class TestTrajectoryPlanner(unittest.TestCase):
+    
+    def test_joint_s_curve_endpoint_accuracy(self):
+        """Verifies that the S-curve trajectory terminates exactly at the target configuration."""
+        q_start = INFEED_RETRACT_JOINTS
+        q_end = TRAY_SLOT_JOINTS[1]["approach"]
+        num_steps = 50
+        
+        traj = generate_joint_s_curve_trajectory(q_start, q_end, num_steps=num_steps)
+        
+        self.assertEqual(len(traj), num_steps)
+        # Final point should match q_end to sub-milliradian precision
+        for actual, expected in zip(traj[-1], q_end):
+            self.assertAlmostEqual(actual, expected, places=4)
+            
+    def test_joint_s_curve_smoothness(self):
+        """
+        Verifies that velocity profile starts and ends near zero (bell-shaped cosine profile),
+        with peak velocity occurring near the trajectory midpoint (t = 0.5).
+        """
+        q_start = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        q_end = [1.0, -1.0, 1.5, -0.5, 1.2, 2.0]
+        num_steps = 60
+        
+        traj = np.array(generate_joint_s_curve_trajectory(q_start, q_end, num_steps=num_steps))
+        
+        # Numerical velocity (finite differences between consecutive waypoints)
+        velocities = np.diff(traj, axis=0)
+        
+        # First delta and last delta should be minimal (near zero velocity at boundaries)
+        v_start = np.linalg.norm(velocities[0])
+        v_end = np.linalg.norm(velocities[-1])
+        v_mid = np.linalg.norm(velocities[len(velocities) // 2])
+        
+        self.assertLess(v_start, v_mid * 0.15, "Start velocity should be much smaller than peak velocity")
+        self.assertLess(v_end, v_mid * 0.15, "End velocity should be much smaller than peak velocity")
+        self.assertGreater(v_mid, v_start * 5.0, "Midpoint velocity should peak cleanly")
+        
+    def test_reject_chute_trajectory_generation(self):
+        """Verifies that S-curve trajectory can be generated cleanly from infeed to reject chute with shortest angular path."""
+        q_start = list(INFEED_RETRACT_JOINTS)
+        q_start[5] = 2.8000
+        q_end = REJECT_CHUTE_JOINTS["approach"]
+        
+        traj = generate_joint_s_curve_trajectory(q_start, q_end, num_steps=50)
+        self.assertEqual(len(traj), 50)
+        # Joints 0-4 match exact coordinates
+        for i in range(5):
+            self.assertAlmostEqual(traj[-1][i], q_end[i], places=4)
+        # Joint 5 (wrist_3) must match target orientation (difference is 0 modulo 2*pi)
+        wrist_diff = (traj[-1][5] - q_end[5] + np.pi) % (2.0 * np.pi) - np.pi
+        self.assertAlmostEqual(wrist_diff, 0.0, places=4)
+        # Total angular change for wrist 3 must be under 180 degrees (pi radians) due to unwrapping
+        self.assertLess(abs(traj[-1][5] - q_start[5]), np.pi)
+
+    def test_cartesian_trajectory(self):
+        """Verifies Cartesian linear and S-curve path generation."""
+        p_start = [0.0, 0.40, 0.18]
+        p_end = [0.35, 0.20, 0.18]
+        
+        traj_linear = generate_cartesian_trajectory(p_start, p_end, num_steps=20, s_curve=False)
+        traj_scurve = generate_cartesian_trajectory(p_start, p_end, num_steps=20, s_curve=True)
+        
+        self.assertEqual(len(traj_linear), 21)
+        self.assertEqual(len(traj_scurve), 21)
+        self.assertAlmostEqual(traj_linear[-1][0], 0.35, places=4)
+        self.assertAlmostEqual(traj_scurve[-1][0], 0.35, places=4)
+
+    def test_adaptive_approach_pose(self):
+        """Verifies adaptive orientation calculation for vision coordinates."""
+        poses = compute_adaptive_approach_pose(0.01, 0.39, 45.0)
+        self.assertIn("approach_pose", poses)
+        self.assertIn("pick_pose", poses)
+        self.assertIn("lift_pose", poses)
+        self.assertAlmostEqual(poses["approach_pose"][5], np.radians(45.0), places=4)
+
+
+if __name__ == "__main__":
+    unittest.main()

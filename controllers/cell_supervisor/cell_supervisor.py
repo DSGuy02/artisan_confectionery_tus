@@ -37,7 +37,10 @@ from motion.waypoints import (
     get_tray_slot_joints,
     compute_wrist_orientation
 )
-from motion.trajectory_planner import compute_adaptive_approach_pose
+from motion.trajectory_planner import (
+    compute_adaptive_approach_pose,
+    generate_joint_s_curve_trajectory
+)
 
 # Attempt to import Webots controller library
 try:
@@ -239,11 +242,10 @@ class ConfectioneryCellSupervisor:
             # ---------------------------------------------------------------
             elif self.state == "EVALUATE_QUALITY":
                 if self.current_detection["is_defective"]:
-                    print("[QUALITY ALERT] Surface chipped / defective! Diverting to REJECT_ROUTINE.")
-                    self.state = "REJECT_ROUTINE"
+                    print("[QUALITY ALERT] Surface chipped / defective! Flagged for remelt chute rejection after pick.")
                 else:
-                    print("[QUALITY PASS] Surface intact. Proceeding to PICK_APPROACH.")
-                    self.state = "PICK_APPROACH"
+                    print("[QUALITY PASS] Surface intact. Proceeding to packaging pick.")
+                self.state = "PICK_APPROACH"
                 self.wait_steps = 20
 
             # ---------------------------------------------------------------
@@ -288,7 +290,13 @@ class ConfectioneryCellSupervisor:
                         retract_pose = list(INFEED_RETRACT_JOINTS)
                         retract_pose[5] = wrist_yaw
                         self.set_joint_positions(retract_pose)
-                        self.state = "TRANSFER_TRAY"
+                        
+                        if self.current_detection.get("is_defective", False):
+                            print("[ROUTING] Workpiece is defective. Diverting to REJECT_ROUTINE.")
+                            self.state = "REJECT_ROUTINE"
+                        else:
+                            print("[ROUTING] Workpiece passed quality check. Proceeding to TRANSFER_TRAY.")
+                            self.state = "TRANSFER_TRAY"
                         self.wait_steps = 50
                     else:
                         print("[FAULT] Grip verification failed or dropped piece! Executing SAFE_RECOVERY.")
@@ -314,15 +322,8 @@ class ConfectioneryCellSupervisor:
                     q_start[5] = wrist_yaw
                     q_end = get_tray_slot_joints(target_slot, "approach")
                     
-                    # Generate 50-step smooth S-curve interpolated joint trajectory
-                    N_PTS = 50
-                    traj = []
-                    for i in range(1, N_PTS + 1):
-                        t = i / float(N_PTS)
-                        alpha = (1.0 - np.cos(t * np.pi)) / 2.0
-                        q_pt = [(1.0 - alpha) * s + alpha * e for s, e in zip(q_start, q_end)]
-                        traj.append(q_pt)
-                    self.transfer_trajectory = traj
+                    # Modular 50-step smooth S-curve interpolated joint trajectory
+                    self.transfer_trajectory = generate_joint_s_curve_trajectory(q_start, q_end, num_steps=50)
                     self.transfer_index = 0
                 
                 if self.transfer_index < len(self.transfer_trajectory):
@@ -384,14 +385,31 @@ class ConfectioneryCellSupervisor:
             # FSM STATE 7: REJECT_ROUTINE (Scrap Remediation)
             # ---------------------------------------------------------------
             elif self.state == "REJECT_ROUTINE":
-                print("[REJECT] Transferring defective item to Gravity Remelt Chute.")
                 rej_step = getattr(self, "reject_substep", 0)
                 
                 if rej_step == 0:
-                    # Step 1: Move to chute approach
-                    self.set_joint_positions(REJECT_CHUTE_JOINTS["approach"])
-                    self.reject_substep = 1
-                    self.wait_steps = 60
+                    # Step 1: S-curve smooth transit from infeed retract to chute approach
+                    if not hasattr(self, "reject_trajectory") or self.reject_trajectory is None:
+                        choc_p = self.choc_node.getPosition() if self.choc_node else [0, 0, 0]
+                        print(f"[REJECT] Defective item secured (Z = {choc_p[2]:.3f} m).")
+                        print("[REJECT] Executing smooth S-curve transit to Gravity Remelt Chute.")
+                        angle_deg = self.current_detection["orientation_deg"]
+                        wrist_yaw = compute_wrist_orientation(angle_deg)
+                        q_start = list(INFEED_RETRACT_JOINTS)
+                        q_start[5] = wrist_yaw
+                        q_end = REJECT_CHUTE_JOINTS["approach"]
+                        self.reject_trajectory = generate_joint_s_curve_trajectory(q_start, q_end, num_steps=50)
+                        self.reject_index = 0
+                        
+                    if self.reject_index < len(self.reject_trajectory):
+                        self.set_joint_positions(self.reject_trajectory[self.reject_index])
+                        self.reject_index += 1
+                        self.wait_steps = 2  # 32ms per waypoint for smooth transit
+                    else:
+                        self.reject_trajectory = None
+                        self.reject_index = 0
+                        self.reject_substep = 1
+                        self.wait_steps = 25
                 elif rej_step == 1:
                     # Step 2: Lower into chute deposit position
                     self.set_joint_positions(REJECT_CHUTE_JOINTS["deposit"])
@@ -399,6 +417,8 @@ class ConfectioneryCellSupervisor:
                     self.wait_steps = 35
                 elif rej_step == 2:
                     # Step 3: Open gripper to drop into chute
+                    choc_p = self.choc_node.getPosition() if self.choc_node else [0, 0, 0]
+                    print(f"[CHUTE DEPOSIT] Releasing scrap at X={choc_p[0]:.4f}, Y={choc_p[1]:.4f}, Z={choc_p[2]:.4f} m.")
                     self.set_gripper(open_pos=True)
                     self.reject_substep = 3
                     self.wait_steps = 25
@@ -414,7 +434,7 @@ class ConfectioneryCellSupervisor:
                         self.current_detection["chocolate_type"],
                         self.current_detection["orientation_deg"],
                         self.current_detection["solidity"],
-                        0.0, cycle_time, "Fault_Chipped_Defect", "REJECTED_TO_CHUTE"
+                        0.18, cycle_time, "Fault_Chipped_Defect", "REJECTED_TO_CHUTE"
                     )
                     print("[SCRAP LOGGED] Defective piece deposited in remelt bin. Line ready.")
                     self.set_joint_positions(HOME_POSE_JOINTS)
