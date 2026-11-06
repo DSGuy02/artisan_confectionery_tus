@@ -19,7 +19,10 @@ from motion.trajectory_planner import (
 from motion.waypoints import (
     INFEED_RETRACT_JOINTS,
     TRAY_SLOT_JOINTS,
-    REJECT_CHUTE_JOINTS
+    TRAY_SLOT_TARGETS,
+    REJECT_CHUTE_JOINTS,
+    forward_kinematics,
+    verify_reachability
 )
 
 
@@ -98,6 +101,55 @@ class TestTrajectoryPlanner(unittest.TestCase):
         self.assertIn("pick_pose", poses)
         self.assertIn("lift_pose", poses)
         self.assertAlmostEqual(poses["approach_pose"][5], np.radians(45.0), places=4)
+
+    def test_all_blister_tray_slots_kinematics_and_trajectories(self):
+        """
+        Validates forward kinematics positioning accuracy and S-curve joint trajectory
+        interpolation across all 4 blister tray pockets (Dark, Milk, Ruby, White).
+        """
+        q_start = list(INFEED_RETRACT_JOINTS)
+        q_start[5] = 2.8000
+        
+        for slot_id in range(1, 5):
+            target = TRAY_SLOT_TARGETS[slot_id]
+            q_app = TRAY_SLOT_JOINTS[slot_id]["approach"]
+            q_place = TRAY_SLOT_JOINTS[slot_id]["place"]
+            q_ret = TRAY_SLOT_JOINTS[slot_id]["retract"]
+            
+            # 1. Verify S-curve transit trajectory from infeed retract to slot approach
+            traj = generate_joint_s_curve_trajectory(q_start, q_app, num_steps=50)
+            self.assertEqual(len(traj), 50)
+            for i in range(5):
+                self.assertAlmostEqual(traj[-1][i], q_app[i], places=4)
+                
+            # 2. Verify approach pose positioning (Z = 0.180m clearance)
+            pos_app, rot_app = forward_kinematics(q_app)
+            self.assertAlmostEqual(pos_app[0], target["X"], places=3)
+            self.assertAlmostEqual(pos_app[1], target["Y"], places=3)
+            self.assertAlmostEqual(pos_app[2], 0.1800, places=3)
+            self.assertAlmostEqual(rot_app[2, 2], -1.0, places=3)  # Gripper points straight down
+            
+            # 3. Verify pocket plunge seating pose (Z = 0.080m contact level)
+            pos_place, rot_place = forward_kinematics(q_place)
+            self.assertAlmostEqual(pos_place[0], target["X"], places=3)
+            self.assertAlmostEqual(pos_place[1], target["Y"], places=3)
+            self.assertAlmostEqual(pos_place[2], 0.0800, places=3)
+            self.assertAlmostEqual(rot_place[2, 2], -1.0, places=3)
+            
+            # 4. Verify vertical retract pose (Z = 0.220m clearance height)
+            pos_ret, rot_ret = forward_kinematics(q_ret)
+            self.assertAlmostEqual(pos_ret[0], target["X"], places=3)
+            self.assertAlmostEqual(pos_ret[1], target["Y"], places=3)
+            self.assertAlmostEqual(pos_ret[2], 0.2200, places=3)
+            self.assertAlmostEqual(rot_ret[2, 2], -1.0, places=3)
+
+    def test_all_cell_targets_reachability(self):
+        """Verifies that all cell targets (infeed, 4 tray slots, reject chute) fall within optimal reach."""
+        report = verify_reachability()
+        self.assertEqual(len(report), 6)
+        for name, metrics in report.items():
+            self.assertEqual(metrics["status"], "PASS (Optimal Dexterity)", 
+                             f"Target {name} failed optimal dexterity check: {metrics}")
 
 
 if __name__ == "__main__":
