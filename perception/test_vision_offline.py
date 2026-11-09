@@ -52,6 +52,11 @@ def create_synthetic_test_images(output_dir):
     chip_pts = np.array([[370, 200], [315, 240], [370, 280]], np.int32)
     cv2.fillPoly(img_chipped, [chip_pts], (240, 240, 240))  # Match background table
     images["dark_chocolate_chipped_defect.png"] = img_chipped
+
+    # 5. Normal White Chocolate (light cream tone on the light inspection background)
+    img_white = np.full((480, 640, 3), 240, dtype=np.uint8)
+    cv2.rectangle(img_white, (270, 190), (370, 290), (190, 195, 200), -1)
+    images["white_chocolate_normal.png"] = img_white
     
     for filename, img in images.items():
         filepath = os.path.join(output_dir, filename)

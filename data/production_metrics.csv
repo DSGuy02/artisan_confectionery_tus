@@ -50,3 +50,7 @@ Timestamp,CycleID,Variety,AngleDeg,Solidity,GripForceN,CycleTimeSec,CaseType,Sta
 1794235638.01,1,Dark,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_1
 1794237045.28,1,Dark,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_1
 1794238037.07,1,Dark,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_1
+1794238912.23,1,Dark,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_1
+1794239111.44,1,Dark,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_1
+1794239992.76,1,Dark,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_1
+1794243328.54,1,Milk,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_2
