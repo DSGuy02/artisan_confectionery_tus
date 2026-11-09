@@ -226,6 +226,7 @@ class ConfectioneryCellSupervisor:
                     bgr_frame = convert_webots_to_cv(raw_bytes, 
                                                     self.camera.getWidth(), 
                                                     self.camera.getHeight())
+                    print("[CAMERA CHECK] Image shape:", bgr_frame.shape)
                     # TODO (Partner 2): Tune min_contour_area & HSV masks for Webots lighting
                     detection = inspect_chocolate(bgr_frame)
                     
