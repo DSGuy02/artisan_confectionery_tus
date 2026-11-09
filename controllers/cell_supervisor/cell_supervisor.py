@@ -10,6 +10,7 @@ import os
 import time
 import csv
 import math
+import cv2
 import numpy as np
 
 # Add project root to sys.path so modules can be imported inside Webots
@@ -128,6 +129,7 @@ class ConfectioneryCellSupervisor:
         self.cycle_id = 0
         self.cycle_start_time = 0.0
         self.current_detection = None
+        self.vision_validation_saved = False
         self.csv_path = os.path.join(project_root, "data/production_metrics.csv")
         self._init_csv()
 
@@ -231,6 +233,17 @@ class ConfectioneryCellSupervisor:
                     detection = inspect_chocolate(bgr_frame)
                     
                     if detection.get("valid", False):
+                        if not self.vision_validation_saved:
+                            vision_dir = os.path.join(project_root, "data", "vision_validation")
+                            os.makedirs(vision_dir, exist_ok=True)
+                            raw_path = os.path.join(vision_dir, "raw_camera.png")
+                            annotated_path = os.path.join(vision_dir, "annotated_camera.png")
+                            cv2.imwrite(raw_path, bgr_frame)
+                            annotated_frame = draw_inspection_overlay(bgr_frame, detection)
+                            cv2.imwrite(annotated_path, annotated_frame)
+                            self.vision_validation_saved = True
+                            print(f"[VISION VALIDATION] Saved images to {vision_dir}")
+
                         self.current_detection = detection
                         self.cycle_id += 1
                         self.cycle_start_time = self.robot.getTime()
