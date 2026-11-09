@@ -66,3 +66,4 @@ Timestamp,CycleID,Variety,AngleDeg,Solidity,GripForceN,CycleTimeSec,CaseType,Sta
 1794247475.33,1,Dark,45.0,1.0,0.0,9.28,Fault_Lost_Grip,ABORT_LOST_GRIP
 1794247630.18,1,Dark,45.0,1.0,0.0,9.65,Fault_Lost_Grip,ABORT_LOST_GRIP
 1794259099.56,1,Dark,45.0,0.579,0.18,9.04,Fault_Chipped_Defect,REJECTED_TO_CHUTE
+1794263142.95,1,Dark,45.0,1.0,0.0,9.65,Fault_Lost_Grip,ABORT_LOST_GRIP
