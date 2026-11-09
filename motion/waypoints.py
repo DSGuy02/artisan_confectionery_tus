@@ -62,6 +62,72 @@ TRANSFORM_WORLD_TO_TRAY = T_W_T
 TRANSFORM_WORLD_TO_REJECT = T_W_Q
 
 
+def transform_point(T, point):
+    """
+    Applies a 4x4 homogeneous transformation matrix T to a 3D Cartesian point [X, Y, Z].
+    
+    Args:
+        T (np.ndarray): 4x4 homogeneous transformation matrix.
+        point (list or np.ndarray): 3D coordinates [X, Y, Z].
+        
+    Returns:
+        np.ndarray: Transformed 3D point [X', Y', Z'].
+    """
+    p_hom = np.append(np.asarray(point, dtype=float)[:3], 1.0)
+    p_trans = T @ p_hom
+    return p_trans[:3]
+
+
+def invert_transformation(T):
+    """
+    Computes the exact analytical inverse of a 4x4 rigid-body homogeneous
+    transformation matrix T = [[R, p], [0, 1]] using:
+        T^-1 = [[R^T, -R^T @ p], [0, 1]]
+        
+    Args:
+        T (np.ndarray): 4x4 homogeneous transformation matrix.
+        
+    Returns:
+        np.ndarray: 4x4 inverted transformation matrix.
+    """
+    R = T[:3, :3]
+    p = T[:3, 3]
+    T_inv = np.eye(4)
+    T_inv[:3, :3] = R.T
+    T_inv[:3, 3] = -R.T @ p
+    return T_inv
+
+
+def get_tray_slot_transform(slot_id, stage="place"):
+    """
+    Computes the 4x4 homogeneous transformation matrix T_W_slot mapping
+    a target blister tray cavity in the world frame {W} from the tray fixture
+    reference frame {T} using the transformation chain:
+        T_W_slot = T_W_T @ T_T_slot
+        
+    Args:
+        slot_id (int): Cavity pocket index (1, 2, 3, or 4).
+        stage (str): 'approach' (Z = 0.180m), 'place' (Z = 0.081m), or 'retract' (Z = 0.220m).
+        
+    Returns:
+        np.ndarray: 4x4 homogeneous transformation matrix in world coordinates.
+    """
+    if slot_id not in (1, 2, 3, 4):
+        raise ValueError(f"Invalid slot ID {slot_id}. Must be 1, 2, 3, or 4.")
+        
+    z_map = {"approach": 0.180, "place": 0.081, "retract": 0.220}
+    z_height = z_map.get(stage, 0.081)
+    
+    # 2x2 presentation grid spacing: dx = 0.045m, dy = 0.045m relative to Tray Reference {T}
+    dx = 0.045 if slot_id in (2, 4) else 0.000
+    dy = 0.045 if slot_id in (3, 4) else 0.000
+    
+    T_T_slot = np.eye(4)
+    T_T_slot[:3, 3] = [dx, dy, z_height - 0.040]
+    
+    return T_W_T @ T_T_slot
+
+
 # ---------------------------------------------------------------------------
 # 2. CALIBRATED UR5e JOINT CONFIGURATIONS (6-DOF)
 # Joint order: [shoulder_pan, shoulder_lift, elbow, wrist_1, wrist_2, wrist_3]
@@ -201,16 +267,20 @@ GRASP_TCP_OFFSET   = 0.130   # Gripper base -> centre of finger pads (along grip
 TOUCH_SENSOR_OFFSET = 0.125  # Gripper base -> TouchSensor pad (matches the .wbt file)
 
 
-def forward_kinematics(q, tcp_offset=GRASP_TCP_OFFSET):
+def forward_kinematics_homogeneous(q, tcp_offset=GRASP_TCP_OFFSET):
     """
-    Forward kinematics of the Webots CellUR5e manipulator with the Robotiq 2F-85.
-    The chain follows the joint anchors in protos/CellUR5e.proto, then the
-    TOOL_MOUNT Pose in the world file (rotation 1 0 0 -1.5708), which lines the
-    gripper +Z axis up with the wrist_3 (flange) axis.
-    Checked against Webots scene-tree readings to within 0.5 mm.
-
-    Returns: (tcp_position [X, Y, Z], gripper rotation matrix 3x3)
-      gripper columns: x, y (finger closing direction), z (approach direction)
+    Computes the complete 4x4 homogeneous transformation matrix T_W_TCP mapping
+    the robot tool centre point {TCP} relative to the robot base / world frame {W}.
+    The kinematic chain follows the joint parameters in protos/CellUR5e.proto,
+    the toolSlot offset, the TOOL_MOUNT Pose rotation (1 0 0 -1.5708), and the
+    Robotiq finger offset along the gripper approach vector +Z.
+    
+    Args:
+        q (list or np.ndarray): 6-DOF joint angles [q1, q2, q3, q4, q5, q6] in radians.
+        tcp_offset (float): Tool centre point distance from gripper base flange.
+        
+    Returns:
+        np.ndarray: 4x4 homogeneous transformation matrix T_W_TCP.
     """
     def rot_axis(axis, angle):
         ux, uy, uz = axis
@@ -236,7 +306,17 @@ def forward_kinematics(q, tcp_offset=GRASP_TCP_OFFSET):
     T = T @ trans(0, 0.1, 0)                      # toolSlot
     T = T @ rot_axis([1, 0, 0], -1.5708)          # TOOL_MOUNT
     T_tip = T @ trans(0, 0, tcp_offset)
-    return T_tip[:3, 3], T[:3, :3]
+    return T_tip
+
+
+def forward_kinematics(q, tcp_offset=GRASP_TCP_OFFSET):
+    """
+    Forward kinematics of the Webots CellUR5e manipulator with the Robotiq 2F-85.
+    Returns: (tcp_position [X, Y, Z], gripper rotation matrix 3x3)
+      gripper columns: x, y (finger closing direction), z (approach direction)
+    """
+    T = forward_kinematics_homogeneous(q, tcp_offset)
+    return T[:3, 3], T[:3, :3]
 
 
 def verify_reachability():

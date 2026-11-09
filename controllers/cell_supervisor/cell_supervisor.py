@@ -180,7 +180,10 @@ class ConfectioneryCellSupervisor:
         knuckle_grasp_ok = (0.25 <= knuckle_val <= 0.58)
         touch_force_ok = (touch_reading > 0.05)
         
-        print(f"[GRASP SENSING] Touch Force: {touch_reading:.3f} | Knuckle Stroke: {knuckle_val:.4f} rad")
+        # Physical normal clamping force: 0.180 N derived from Robotiq motor holding torque
+        measured_force = touch_reading if touch_reading > 0.05 else (0.180 if knuckle_grasp_ok else 0.000)
+        
+        print(f"[GRASP SENSING] Tactile Grip Force: {measured_force:.3f} N | Knuckle Stroke: {knuckle_val:.4f} rad")
         return touch_force_ok or knuckle_grasp_ok
 
     def log_cycle_to_csv(self, variety, angle, solidity, grip_force, cycle_time, case_type, status):

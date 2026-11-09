@@ -22,7 +22,17 @@ from motion.waypoints import (
     TRAY_SLOT_TARGETS,
     REJECT_CHUTE_JOINTS,
     SAFE_RETRACT_JOINTS,
+    HOME_POSE_JOINTS,
+    T_W_R0,
+    T_W_C,
+    T_W_F,
+    T_W_T,
+    T_W_Q,
+    transform_point,
+    invert_transformation,
+    get_tray_slot_transform,
     forward_kinematics,
+    forward_kinematics_homogeneous,
     verify_reachability
 )
 
@@ -162,6 +172,45 @@ class TestTrajectoryPlanner(unittest.TestCase):
         self.assertAlmostEqual(pos[1], 0.4000, places=3)
         self.assertAlmostEqual(pos[2], 0.2500, places=3)
         self.assertAlmostEqual(rot[2, 2], -1.0, places=3)
+
+    def test_homogeneous_coordinate_transformations(self):
+        """
+        Verifies analytical properties and consistency of 4x4 homogeneous transformation matrices:
+        1. Robot base {R0} coincident with World origin {W} (T_W_R0 = Identity).
+        2. Analytical invertibility: T @ T^-1 = Identity.
+        3. Blister tray cavity positions derived from T_W_T @ T_T_slot match target coordinates.
+        4. forward_kinematics_homogeneous matches forward_kinematics.
+        5. Point transformation matches manual matrix-vector multiplication.
+        """
+        # 1. Base frame coincidence
+        np.testing.assert_allclose(T_W_R0, np.eye(4), atol=1e-6)
+        
+        # 2. Invertibility check on all reference frames
+        for T_name, T_mat in [("Camera", T_W_C), ("Infeed", T_W_F), ("Tray", T_W_T), ("Reject", T_W_Q)]:
+            T_inv = invert_transformation(T_mat)
+            identity_prod = T_mat @ T_inv
+            np.testing.assert_allclose(identity_prod, np.eye(4), atol=1e-6,
+                                       err_msg=f"Inversion failed for {T_name} transformation")
+
+        # 3. Tray slot transformation chain: T_W_slot = T_W_T @ T_T_slot
+        for slot_id in range(1, 5):
+            T_slot = get_tray_slot_transform(slot_id, stage="place")
+            target = TRAY_SLOT_TARGETS[slot_id]
+            self.assertAlmostEqual(T_slot[0, 3], target["X"], places=3)
+            self.assertAlmostEqual(T_slot[1, 3], target["Y"], places=3)
+            self.assertAlmostEqual(T_slot[2, 3], target["Z_place"], places=3)
+
+        # 4. Homogeneous forward kinematics consistency with standard FK
+        T_fk = forward_kinematics_homogeneous(HOME_POSE_JOINTS)
+        pos_fk, rot_fk = forward_kinematics(HOME_POSE_JOINTS)
+        np.testing.assert_allclose(T_fk[:3, 3], pos_fk, atol=1e-5)
+        np.testing.assert_allclose(T_fk[:3, :3], rot_fk, atol=1e-5)
+
+        # 5. Point transformation test
+        test_pt = [0.045, 0.045, 0.041]
+        p_transformed = transform_point(T_W_T, test_pt)
+        expected_pt = [0.395, 0.245, 0.081]  # Slot 4 place position
+        np.testing.assert_allclose(p_transformed, expected_pt, atol=1e-5)
 
 
 if __name__ == "__main__":
