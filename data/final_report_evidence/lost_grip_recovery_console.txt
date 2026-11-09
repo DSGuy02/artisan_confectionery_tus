@@ -1,0 +1,30 @@
+INFO: cell_supervisor_grip_test: Starting controller: /Users/medya/Downloads/artisan_confectionery_tus/venv/bin/python -u cell_supervisor_grip_test.py
+Device "ROBOTIQ 2F-85 Gripper left finger sensor" was not found on robot "UR5e"
+[INFO] Inspection camera initialized and enabled.
+[GRIP TEST SENSOR] touch_sensor=AVAILABLE
+[GRIP TEST SENSOR] finger_position_sensor=AVAILABLE (ROBOTIQ 2F-85 Gripper left finger joint sensor)
+==================================================================
+ ARTISAN CONFECTIONERY ROBOTIC CELL SUPERVISOR INITIALIZED
+ Finite State Machine (FSM) Running. Monitoring Infeed...
+==================================================================
+[CAMERA CHECK] Image shape: (480, 640, 3)
+[VISION VALIDATION] Saved images to /Users/medya/Downloads/artisan_confectionery_tus/data/vision_validation
+[CYCLE 1] Workpiece Sensed on Infeed.
+ -> Variety: Dark
+ -> Orientation Angle: +45.0 deg
+ -> Solidity Score: 1.000
+[QUALITY PASS] Surface intact. Proceeding to packaging pick.
+[GRIP TEST SENSOR DATA] touch_sensor_raw=0.000 | finger_position_sensor=0.3772 rad
+[GRASP SENSING] Raw touch value: 0.000 | Knuckle position: 0.3772 rad
+[GRIP CONFIRMED] Workpiece secured. Starting vertical clearance retract.
+[ROUTING] Workpiece passed quality check. Proceeding to TRANSFER_TRAY.
+[LIFT VERIFIED] Vertical clearance attained: Z = 0.190 m.
+[TRANSFER] Executing smooth S-curve transit to Slot 1 (Dark) (Cavity 1).
+[GRIP TEST SENSOR DATA] touch_sensor_raw=0.000 | finger_position_sensor=0.3857 rad
+[GRASP SENSING] Raw touch value: 0.000 | Knuckle position: 0.3857 rad
+[TEST INJECTION] Simulated lost grip during transfer
+[FAULT ALERT] Transfer aborted; entering SAFE_RECOVERY.
+[RECOVERY STEP 1] Commanding emergency retract joint pose; Cartesian clearance is not measured. Keeping gripper closed.
+[RECOVERY STEP 2] Retract wait elapsed. Commanding return to Home joints.
+[HOME VERIFIED] Robot reached Home position
+[SAFE RECOVERY COMPLETE] Home position verified. Fault logged to CSV. Cycle time: 9.65s.

@@ -1,0 +1,57 @@
+INFO: cell_supervisor_multicycle_test: Starting controller: /Users/medya/Downloads/artisan_confectionery_tus/venv/bin/python -u cell_supervisor_multicycle_test.py
+INFO: cell_supervisor_multicycle_feeder: Starting controller: /Users/medya/Downloads/artisan_confectionery_tus/venv/bin/python -u cell_supervisor_multicycle_feeder.py
+[INFO] Inspection camera initialized and enabled.
+[INFO] Gripper touch sensor initialized.
+[INFO] Gripper finger position sensor initialized.
+==================================================================
+ ARTISAN CONFECTIONERY ROBOTIC CELL SUPERVISOR INITIALIZED
+ Finite State Machine (FSM) Running. Monitoring Infeed...
+==================================================================
+[CAMERA CHECK] Image shape: (480, 640, 3)
+[VISION VALIDATION] Saved images to /Users/medya/Downloads/artisan_confectionery_tus/data/vision_validation/multicycle_test
+[CYCLE 1] Started
+[CYCLE 1] Workpiece Sensed on Infeed.
+ -> Variety: Dark
+ -> Orientation Angle: +45.0 deg
+ -> Solidity Score: 1.000
+[QUALITY PASS] Surface intact. Proceeding to packaging pick.
+[GRASP SENSING] Touch sensor raw value: 0.000 | Knuckle position: 0.3772 rad
+[GRIP CONFIRMED] Workpiece secured. Starting vertical clearance retract.
+[ROUTING] Workpiece passed quality check. Proceeding to TRANSFER_TRAY.
+[LIFT VERIFIED] Vertical clearance attained: Z = 0.190 m.
+[TRANSFER] Executing smooth S-curve transit to Slot 1 (Dark) (Cavity 1).
+[GRASP SENSING] Touch sensor raw value: 0.000 | Knuckle position: 0.3857 rad
+[GRASP SENSING] Touch sensor raw value: 0.000 | Knuckle position: 0.3893 rad
+[GRASP SENSING] Touch sensor raw value: 0.000 | Knuckle position: 0.3863 rad
+[GRASP SENSING] Touch sensor raw value: 0.000 | Knuckle position: 0.3846 rad
+[TRAY POSITION] Plunge seated at X=0.3497, Y=0.1999, Z=0.0501 m.
+[PLACEMENT] Gripper release commanded at cavity 1; placement is not independently sensed.
+[CYCLE 1] Controller sequence completed; placement is not independently sensed.
+[CYCLE 1] Completed (controller sequence; placement not independently sensed).
+[FEEDER] Requesting second chocolate.
+[FEEDER] Second chocolate ready
+[FEEDER] Second chocolate ready
+[CAMERA CHECK] Image shape: (480, 640, 3)
+[CYCLE 2] Started
+[CYCLE 2] Workpiece Sensed on Infeed.
+ -> Variety: Dark
+ -> Orientation Angle: +0.0 deg
+ -> Solidity Score: 1.000
+[QUALITY PASS] Surface intact. Proceeding to packaging pick.
+[GRASP SENSING] Touch sensor raw value: 0.000 | Knuckle position: 0.4976 rad
+[GRIP CONFIRMED] Workpiece secured. Starting vertical clearance retract.
+[ROUTING] Workpiece passed quality check. Proceeding to TRANSFER_TRAY.
+[LIFT VERIFIED] Vertical clearance attained: Z = 0.184 m.
+[TRANSFER] Executing smooth S-curve transit to Slot 1 (Dark) (Cavity 1).
+[GRASP SENSING] Touch sensor raw value: 0.000 | Knuckle position: 0.5390 rad
+[GRASP SENSING] Touch sensor raw value: 0.000 | Knuckle position: 0.5507 rad
+[GRASP SENSING] Touch sensor raw value: 0.000 | Knuckle position: 0.5568 rad
+[GRASP SENSING] Touch sensor raw value: 0.000 | Knuckle position: 0.5525 rad
+[TRAY POSITION] Plunge seated at X=0.3471, Y=0.2124, Z=0.0498 m.
+[PLACEMENT] Gripper release commanded at cavity 1; placement is not independently sensed.
+[CYCLE 2] Controller sequence completed; placement is not independently sensed.
+[CYCLE 2] Completed (controller sequence; placement not independently sensed).
+[MULTICYCLE TEST] Two controller cycles complete; stopping.
+INFO: 'cell_supervisor_multicycle_test' controller exited successfully.
+[FEEDER] Two-cycle test complete; stopping feeder controller.
+INFO: 'cell_supervisor_multicycle_feeder' controller exited successfully.
