@@ -53,6 +53,8 @@ except ImportError:
 
 class ConfectioneryCellSupervisor:
     """Master supervisory controller for the artisan confectionery packaging cell."""
+
+    HOME_VERIFY_MAX_STEPS = 200
     
     def __init__(self):
         if not WEBOTS_AVAILABLE:
@@ -91,12 +93,16 @@ class ConfectioneryCellSupervisor:
         ]
         self.motors = []
         self.position_sensors = []
+        self.motor_by_joint = {}
+        self.position_sensor_by_joint = {}
         for name in self.joint_names:
             motor = self.robot.getDevice(name)
+            self.motor_by_joint[name] = motor
             if motor:
                 motor.setVelocity(1.0)
                 self.motors.append(motor)
             sensor = self.robot.getDevice(f"{name}_sensor")
+            self.position_sensor_by_joint[name] = sensor
             if sensor:
                 sensor.enable(self.time_step)
                 self.position_sensors.append(sensor)
@@ -141,6 +147,7 @@ class ConfectioneryCellSupervisor:
         self.cycle_start_time = 0.0
         self.current_detection = None
         self.vision_validation_saved = False
+        self.grip_test_injection_used = False
         self.csv_path = os.path.join(project_root, "data/production_metrics.csv")
         self._init_csv()
 
@@ -177,33 +184,55 @@ class ConfectioneryCellSupervisor:
             motor.setPosition(angle)
 
     def joints_reached(self, target_joints, tol=0.04):
-        """Returns True if arm position sensors have settled near target_joints."""
-        if not self.position_sensors or len(self.position_sensors) != len(target_joints):
-            return True
-        return all(abs(s.getValue() - target) < tol 
-                   for s, target in zip(self.position_sensors, target_joints))
+        """Returns True only when every required joint sensor confirms its target."""
+        if len(self.position_sensors) != len(target_joints):
+            return False
+        measured_positions = [sensor.getValue() for sensor in self.position_sensors]
+        return all(
+            math.isfinite(measured) and abs(measured - target) < tol
+            for measured, target in zip(measured_positions, target_joints)
+        )
+
+    def log_joint_position_diagnostics(self, target_joint_angles):
+        """Print per-joint target, measured position, error, and device availability."""
+        print("[HOME DIAGNOSTIC] Joint error is measured position minus target.")
+        for index, name in enumerate(self.joint_names):
+            target = target_joint_angles[index]
+            sensor = self.position_sensor_by_joint.get(name)
+            motor_status = "available" if self.motor_by_joint.get(name) is not None else "MISSING"
+            if sensor is None:
+                print(
+                    f"[HOME DIAGNOSTIC] {name}: target={target:+.5f} rad "
+                    f"actual=MISSING error=UNAVAILABLE motor={motor_status}"
+                )
+                continue
+
+            actual = sensor.getValue()
+            error = actual - target
+            print(
+                f"[HOME DIAGNOSTIC] {name}: target={target:+.5f} rad "
+                f"actual={actual:+.5f} rad error={error:+.5f} rad "
+                f"motor={motor_status}"
+            )
 
     def verify_grasp(self):
         """Queries touch sensor and gripper knuckle stroke to confirm positive workpiece grasp."""
         touch_reading = self.touch_sensor.getValue() if self.touch_sensor else None
         knuckle_val = self.finger_sensor.getValue() if self.finger_sensor else None
 
-        touch_text = f"{touch_reading:.3f} N" if touch_reading is not None else "MISSING"
+        touch_text = f"{touch_reading:.3f}" if touch_reading is not None else "MISSING"
         knuckle_text = f"{knuckle_val:.4f} rad" if knuckle_val is not None else "MISSING"
-        print(f"[GRIP TEST DIAGNOSTIC] touch_sensor={touch_text} | finger_position_sensor={knuckle_text}")
+        print(f"[GRIP TEST SENSOR DATA] touch_sensor_raw={touch_text} | finger_position_sensor={knuckle_text}")
         if touch_reading is None and knuckle_val is None:
             print("[GRASP WARNING] No grip sensors available; treating grasp as failed.")
         
         # When 35mm chocolate is grasped: knuckle settles between 0.30 and 0.58 rad.
         # When fingers close on empty space without workpiece: knuckle exceeds 0.60 rad.
         knuckle_grasp_ok = knuckle_val is not None and (0.25 <= knuckle_val <= 0.58)
-        touch_force_ok = touch_reading is not None and (touch_reading > 0.05)
-        
-        # Physical normal clamping force: 0.180 N derived from Robotiq motor holding torque
-        measured_force = touch_reading if touch_force_ok else (0.180 if knuckle_grasp_ok else 0.000)
-        
-        print(f"[GRASP SENSING] Tactile Grip Force: {measured_force:.3f} N | Knuckle Stroke: {knuckle_text}")
-        return touch_force_ok or knuckle_grasp_ok
+        touch_contact_ok = touch_reading is not None and (touch_reading > 0.05)
+
+        print(f"[GRASP SENSING] Raw touch value: {touch_text} | Knuckle position: {knuckle_text}")
+        return touch_contact_ok or knuckle_grasp_ok
 
     def log_cycle_to_csv(self, variety, angle, solidity, grip_force, cycle_time, case_type, status):
         """Appends cycle telemetry to production CSV log."""
@@ -362,13 +391,20 @@ class ConfectioneryCellSupervisor:
                 
                 if self.transfer_index < len(self.transfer_trajectory):
                     # Monitor grip integrity periodically during transit (every 10 waypoints)
-                    if self.transfer_index > 0 and self.transfer_index % 10 == 0 and not self.verify_grasp():
-                        print("[FAULT ALERT] Workpiece slipped mid-transit! Aborting transfer and initiating SAFE_RECOVERY.")
-                        self.transfer_trajectory = None
-                        self.transfer_index = 0
-                        self.state = "SAFE_RECOVERY"
-                        self.wait_steps = 10
-                        continue
+                    if self.transfer_index > 0 and self.transfer_index % 10 == 0:
+                        grasp_ok = self.verify_grasp()
+                        if not self.grip_test_injection_used:
+                            self.grip_test_injection_used = True
+                            print("[TEST INJECTION] Simulated lost grip during transfer")
+                            grasp_ok = False
+
+                        if not grasp_ok:
+                            print("[FAULT ALERT] Transfer aborted; entering SAFE_RECOVERY.")
+                            self.transfer_trajectory = None
+                            self.transfer_index = 0
+                            self.state = "SAFE_RECOVERY"
+                            self.wait_steps = 10
+                            continue
                     self.set_joint_positions(self.transfer_trajectory[self.transfer_index])
                     self.transfer_index += 1
                     self.wait_steps = 2  # 32ms per waypoint for smooth transit
@@ -497,9 +533,7 @@ class ConfectioneryCellSupervisor:
             elif self.state == "SAFE_RECOVERY":
                 rec_step = getattr(self, "recovery_substep", 0)
                 if rec_step == 0:
-                    print("[RECOVERY STEP 1] Executing emergency vertical retract to clearance (Z = 0.250 m). Opening gripper.")
-                    self.set_gripper(open_pos=True)
-                    # Maintain aligned wrist orientation during vertical lift
+                    print("[RECOVERY STEP 1] Commanding emergency retract joint pose; Cartesian clearance is not measured. Keeping gripper closed.")
                     angle_deg = self.current_detection.get("orientation_deg", 0.0)
                     wrist_yaw = compute_wrist_orientation(angle_deg)
                     safe_retract = list(SAFE_RETRACT_JOINTS)
@@ -508,11 +542,24 @@ class ConfectioneryCellSupervisor:
                     self.recovery_substep = 1
                     self.wait_steps = 50
                 elif rec_step == 1:
-                    print("[RECOVERY STEP 2] Clearance reached. Slewing safely to Home pose.")
+                    print("[RECOVERY STEP 2] Retract wait elapsed. Commanding return to Home joints.")
                     self.set_joint_positions(HOME_POSE_JOINTS)
                     self.recovery_substep = 2
-                    self.wait_steps = 60
-                else:
+                    self.home_verify_steps = 0
+                    self.home_position_verified = False
+                    self.wait_steps = 1
+                elif rec_step == 2:
+                    self.home_verify_steps += 1
+                    if self.joints_reached(HOME_POSE_JOINTS):
+                        self.home_position_verified = True
+                        print("[HOME VERIFIED] Robot reached Home position")
+                        self.recovery_substep = 3
+                    elif self.home_verify_steps >= self.HOME_VERIFY_MAX_STEPS:
+                        self.home_position_verified = False
+                        print("[RECOVERY INCOMPLETE] Home position not reached")
+                        self.log_joint_position_diagnostics(HOME_POSE_JOINTS)
+                        self.recovery_substep = 3
+                elif rec_step == 3:
                     self.recovery_substep = 0
                     cycle_time = self.robot.getTime() - self.cycle_start_time
                     variety = self.current_detection.get("chocolate_type", "Unknown")
@@ -523,9 +570,16 @@ class ConfectioneryCellSupervisor:
                         variety, angle, solidity, 0.0, cycle_time,
                         "Fault_Lost_Grip", "ABORT_LOST_GRIP"
                     )
-                    print(f"[SAFE RECOVERY COMPLETE] Line secured at Home pose. Fault logged to CSV. Cycle time: {cycle_time:.2f}s.")
-                    self.state = "CYCLE_COMPLETE"
+                    if self.home_position_verified:
+                        print(f"[SAFE RECOVERY COMPLETE] Home position verified. Fault logged to CSV. Cycle time: {cycle_time:.2f}s.")
+                        self.state = "CYCLE_COMPLETE"
+                    else:
+                        print("[RECOVERY LOGGED] Lost-grip abort recorded; recovery remains incomplete.")
+                        self.state = "RECOVERY_INCOMPLETE"
                     self.wait_steps = 70
+
+            elif self.state == "RECOVERY_INCOMPLETE":
+                pass
 
             # ---------------------------------------------------------------
             # FSM STATE 9: CYCLE_COMPLETE (Wait for next workpiece trigger)
