@@ -204,7 +204,6 @@ DEF CHOCOLATE_WORKPIECE Solid {
           6, 16, 13, -1,
           6, 13, 3, -1
         ]
-        solid FALSE
         ccw TRUE
       }
     }
