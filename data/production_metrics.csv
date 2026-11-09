@@ -55,3 +55,6 @@ Timestamp,CycleID,Variety,AngleDeg,Solidity,GripForceN,CycleTimeSec,CaseType,Sta
 1794239992.76,1,Dark,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_1
 1794243328.54,1,Milk,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_2
 1794243627.4,1,Ruby,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_3
+1794243818.85,1,Milk,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_2
+1794243899.83,1,Milk,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_2
+1794244041.04,1,White,45.0,1.0,0.18,9.28,Boundary_Angle_45deg,PACKED_SLOT_4
