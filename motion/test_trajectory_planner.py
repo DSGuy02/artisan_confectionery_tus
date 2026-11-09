@@ -21,6 +21,7 @@ from motion.waypoints import (
     TRAY_SLOT_JOINTS,
     TRAY_SLOT_TARGETS,
     REJECT_CHUTE_JOINTS,
+    SAFE_RETRACT_JOINTS,
     forward_kinematics,
     verify_reachability
 )
@@ -150,6 +151,17 @@ class TestTrajectoryPlanner(unittest.TestCase):
         for name, metrics in report.items():
             self.assertEqual(metrics["status"], "PASS (Optimal Dexterity)", 
                              f"Target {name} failed optimal dexterity check: {metrics}")
+
+    def test_emergency_safe_retract_kinematics(self):
+        """
+        Verifies that SAFE_RETRACT_JOINTS commands a vertical clearance altitude of Z = 0.250m
+        above the infeed pick position with perpendicular downward orientation.
+        """
+        pos, rot = forward_kinematics(SAFE_RETRACT_JOINTS)
+        self.assertAlmostEqual(pos[0], 0.0000, places=3)
+        self.assertAlmostEqual(pos[1], 0.4000, places=3)
+        self.assertAlmostEqual(pos[2], 0.2500, places=3)
+        self.assertAlmostEqual(rot[2, 2], -1.0, places=3)
 
 
 if __name__ == "__main__":

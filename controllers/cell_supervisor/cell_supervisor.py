@@ -327,6 +327,14 @@ class ConfectioneryCellSupervisor:
                     self.transfer_index = 0
                 
                 if self.transfer_index < len(self.transfer_trajectory):
+                    # Monitor grip integrity periodically during transit (every 10 waypoints)
+                    if self.transfer_index > 0 and self.transfer_index % 10 == 0 and not self.verify_grasp():
+                        print("[FAULT ALERT] Workpiece slipped mid-transit! Aborting transfer and initiating SAFE_RECOVERY.")
+                        self.transfer_trajectory = None
+                        self.transfer_index = 0
+                        self.state = "SAFE_RECOVERY"
+                        self.wait_steps = 10
+                        continue
                     self.set_joint_positions(self.transfer_trajectory[self.transfer_index])
                     self.transfer_index += 1
                     self.wait_steps = 2  # 32ms per waypoint for smooth transit
@@ -402,6 +410,14 @@ class ConfectioneryCellSupervisor:
                         self.reject_index = 0
                         
                     if self.reject_index < len(self.reject_trajectory):
+                        # Monitor grip integrity periodically during transit to chute
+                        if self.reject_index > 0 and self.reject_index % 10 == 0 and not self.verify_grasp():
+                            print("[FAULT ALERT] Defective piece slipped mid-transit! Aborting to SAFE_RECOVERY.")
+                            self.reject_trajectory = None
+                            self.reject_index = 0
+                            self.state = "SAFE_RECOVERY"
+                            self.wait_steps = 10
+                            continue
                         self.set_joint_positions(self.reject_trajectory[self.reject_index])
                         self.reject_index += 1
                         self.wait_steps = 2  # 32ms per waypoint for smooth transit
@@ -442,20 +458,38 @@ class ConfectioneryCellSupervisor:
                     self.wait_steps = 70
 
             # ---------------------------------------------------------------
-            # FSM STATE 8: SAFE_RECOVERY
+            # FSM STATE 8: SAFE_RECOVERY (Lost-Grip Emergency Abort)
             # ---------------------------------------------------------------
             elif self.state == "SAFE_RECOVERY":
                 rec_step = getattr(self, "recovery_substep", 0)
                 if rec_step == 0:
-                    print("[RECOVERY] Executing emergency vertical retract to safe clearance.")
+                    print("[RECOVERY STEP 1] Executing emergency vertical retract to clearance (Z = 0.250 m). Opening gripper.")
                     self.set_gripper(open_pos=True)
-                    self.set_joint_positions(SAFE_RETRACT_JOINTS)
+                    # Maintain aligned wrist orientation during vertical lift
+                    angle_deg = self.current_detection.get("orientation_deg", 0.0)
+                    wrist_yaw = compute_wrist_orientation(angle_deg)
+                    safe_retract = list(SAFE_RETRACT_JOINTS)
+                    safe_retract[5] = wrist_yaw
+                    self.set_joint_positions(safe_retract)
                     self.recovery_substep = 1
                     self.wait_steps = 50
+                elif rec_step == 1:
+                    print("[RECOVERY STEP 2] Clearance reached. Slewing safely to Home pose.")
+                    self.set_joint_positions(HOME_POSE_JOINTS)
+                    self.recovery_substep = 2
+                    self.wait_steps = 60
                 else:
                     self.recovery_substep = 0
-                    self.set_joint_positions(HOME_POSE_JOINTS)
-                    print("[SAFE] Fault cleared. Returned to home pose.")
+                    cycle_time = self.robot.getTime() - self.cycle_start_time
+                    variety = self.current_detection.get("chocolate_type", "Unknown")
+                    angle = self.current_detection.get("orientation_deg", 0.0)
+                    solidity = self.current_detection.get("solidity", 0.0)
+                    
+                    self.log_cycle_to_csv(
+                        variety, angle, solidity, 0.0, cycle_time,
+                        "Fault_Lost_Grip", "ABORT_LOST_GRIP"
+                    )
+                    print(f"[SAFE RECOVERY COMPLETE] Line secured at Home pose. Fault logged to CSV. Cycle time: {cycle_time:.2f}s.")
                     self.state = "CYCLE_COMPLETE"
                     self.wait_steps = 70
 
