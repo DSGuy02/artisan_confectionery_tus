@@ -54,7 +54,7 @@ except ImportError:
 class ConfectioneryCellSupervisor:
     """Master supervisory controller for the artisan confectionery packaging cell."""
 
-    HOME_VERIFY_MAX_STEPS = 200
+    HOME_VERIFY_MAX_STEPS = 400
     
     def __init__(self):
         if not WEBOTS_AVAILABLE:

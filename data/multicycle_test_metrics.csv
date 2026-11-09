@@ -1,0 +1,5 @@
+Timestamp,CycleID,Variety,AngleDeg,Solidity,GripForceN,CycleTimeSec,CaseType,Status
+1794259168.9,1,Dark,45.0,1.0,,9.28,Boundary_Angle_45deg,CYCLE_SEQUENCE_COMPLETE
+1794259339.81,1,Dark,45.0,1.0,,9.28,Boundary_Angle_45deg,CYCLE_SEQUENCE_COMPLETE
+1794259482.91,1,Dark,45.0,1.0,,9.28,Boundary_Angle_45deg,CYCLE_SEQUENCE_COMPLETE
+1794259494.19,2,Dark,0.0,1.0,,9.28,Normal,CYCLE_SEQUENCE_COMPLETE
