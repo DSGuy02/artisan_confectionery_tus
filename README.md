@@ -24,11 +24,20 @@ artisan_confectionery_project/
 ├── README.md                       # Main project documentation and instructions
 │
 ├── worlds/                         # Webots simulation worlds
-│   └── confectionery_cell.wbt      # 3D world with UR5e, Robotiq 2F-85, tables, and fixtures
+│   ├── confectionery_cell.wbt      # Primary 3D cell world (UR5e, Robotiq 2F-85, fixtures)
+│   ├── confectionery_cell_milk_test.wbt      # Milk variety classification & Slot 2 test
+│   ├── confectionery_cell_ruby_test.wbt      # Ruby variety classification & Slot 3 test
+│   ├── confectionery_cell_white_test.wbt     # White variety classification & Slot 4 test
+│   ├── confectionery_cell_defect_test.wbt    # Notched defect geometry & chute test
+│   ├── confectionery_cell_grip_test.wbt      # Simulated lost-grip & Home recovery test
+│   └── confectionery_cell_multicycle_test.wbt # Two-cycle mock feeder handshake world
 │
 ├── controllers/                    # Robot controllers
-│   └── cell_supervisor/           # Supervisor controller package
-│       └── cell_supervisor.py     # Master Python Finite State Machine (FSM)
+│   ├── cell_supervisor/            # Primary supervisor controller package
+│   │   └── cell_supervisor.py      # Master Python Finite State Machine (FSM)
+│   ├── cell_supervisor_grip_test/  # Isolated lost-grip fault & Home verification test
+│   ├── cell_supervisor_multicycle_test/      # Two-cycle Emitter/Receiver FSM test
+│   └── cell_supervisor_multicycle_feeder/    # Supervisor mock feeder for Cycle 2 reset
 │
 ├── protos/                         # Webots custom PROTO nodes
 │   ├── CellUR5e.proto              # UR5e with baseSlot for fixed overhead camera
@@ -44,13 +53,20 @@ artisan_confectionery_project/
 ├── motion/                         # Kinematics and motion planning
 │   ├── __init__.py
 │   ├── waypoints.py                # Named targets, coordinate frames {W, R0, TCP, C, T, Q}
-│   └── trajectory_planner.py       # Adaptive approach poses and S-curve velocity profiling
+│   ├── trajectory_planner.py       # Adaptive approach poses and S-curve velocity profiling
+│   └── test_trajectory_planner.py  # Automated kinematics, reachability & S-curve unit tests
 │
-├── data/                           # Runtime telemetry & logs
-│   └── production_metrics.csv      # Logged cycle times, angles, and defect classifications
+├── data/                           # Runtime telemetry, snapshots & archived logs
+│   ├── production_metrics.csv      # Single-cycle & fault telemetry CSV
+│   ├── multicycle_test_metrics.csv # Two-cycle test telemetry CSV
+│   ├── vision_validation/          # Saved Webots overhead camera raw & annotated snapshots
+│   └── final_report_evidence/      # Evidence index & captured Webots console transcripts
 │
 ├── analytics/                      # Post-run analytics and visualization
-│   └── plot_metrics.py             # Script to generate report figures (cycle times & yield)
+│   ├── plot_partner_2_report.py    # Traceable Partner 2 report figure generator
+│   ├── partner_2_analysis/         # Audited dataset (`partner_2_analysis_metrics.csv`)
+│   ├── report_figures/             # Generated report charts (`*.png`)
+│   └── plot_metrics.py             # Legacy single-CSV plot helper
 │
 └── docs/                           # Guidance and technical references
     ├── partner_1_guide.md          # Step-by-step instructions for Partner 1 (Simulation & Motion)
@@ -100,11 +116,17 @@ To run automated test batches without 3D rendering overhead:
 flatpak run com.cyberbotics.webots --batch --mode=fast --no-rendering --stdout --stderr worlds/confectionery_cell.wbt
 ```
 
+Dedicated verification worlds are also provided under `worlds/` for each test case:
+* Variety routing (`+45°`): `confectionery_cell_milk_test.wbt`, `confectionery_cell_ruby_test.wbt`, `confectionery_cell_white_test.wbt`
+* Surface defect scrap rejection: `confectionery_cell_defect_test.wbt`
+* Simulated lost-grip & Home recovery: `confectionery_cell_grip_test.wbt`
+* Two-cycle feeder handshake: `confectionery_cell_multicycle_test.wbt`
+
 ### 3.4 Generate Performance Plots for Report
 ```bash
-python3 analytics/plot_metrics.py
+python3 analytics/plot_partner_2_report.py
 ```
-This generates `data/performance_plot.png` for inclusion in your CA-3 report.
+This reads `analytics/partner_2_analysis/partner_2_analysis_metrics.csv` and saves the traceable report figures (`simulation_cycle_times.png`, `chocolate_solidity.png`, `recorded_controller_outcomes.png`) to `analytics/report_figures/`. *(The legacy helper `analytics/plot_metrics.py` targets `data/production_metrics.csv` directly and outputs `data/performance_plot.png`.)*
 
 ---
 
@@ -171,8 +193,9 @@ The master coordination logic lives in [`controllers/cell_supervisor/cell_superv
 All work on this repository follows an incremental, test-backed workflow:
 1. **Pre-flight verification:** Always run offline tests before committing:
    ```bash
+   python3 motion/test_trajectory_planner.py
    python3 perception/test_vision_offline.py
-   python3 analytics/plot_metrics.py
+   python3 analytics/plot_partner_2_report.py
    ```
 2. **Commit incrementally:** Commit each isolated feature or fix with an informative commit message (e.g. `feat(motion): ...`, `fix(vision): ...`).
 3. **Assessment logbook:** Append a matching plain-text log entry to `Project Log Entries.txt` in the root workspace following the CA-3 activity mappings.
