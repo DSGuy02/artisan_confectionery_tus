@@ -1,0 +1,6 @@
+Timestamp,CycleID,Variety,AngleDeg,Solidity,GripForceN,CycleTimeSec,CaseType,Status
+1794489682.57,1,Dark,45.0,1.0,0.18,8.78,Boundary_Angle_45deg,PACKED_SLOT_1
+1794489683.17,2,Dark,45.0,0.59,0.18,7.46,Fault_Chipped_Defect,REJECTED_TO_CHUTE
+1794489683.81,3,Milk,45.0,1.0,0.18,8.75,Boundary_Angle_45deg,PACKED_SLOT_2
+1794489684.42,4,Ruby,45.0,1.0,0.18,8.75,Boundary_Angle_45deg,PACKED_SLOT_3
+1794489685.08,5,White,45.0,1.0,0.18,8.74,Boundary_Angle_45deg,PACKED_SLOT_4

@@ -1,0 +1,482 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "../protos/CellUR5e.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/robotiq/protos/Robotiq2f85Gripper.proto"
+
+WorldInfo {
+  info [
+    "Artisan Confectionery Full Conveyor Sorting Demo"
+    "Module: Integrated Robotics 4 (TUS Athlone)"
+    "Universal Robots UR5e + Robotiq 2F-85 + OpenCV Vision + Indexed Conveyor"
+  ]
+  title "Artisan Confectionery Full Conveyor Sorting Demo"
+  basicTimeStep 16
+  coordinateSystem "ENU"
+  contactProperties [
+    ContactProperties {
+      material1 "ROBOTIQ gripper pad"
+      material2 "default"
+      coulombFriction [
+        10.0
+      ]
+      bounce 0
+      bounceVelocity 0.01
+    }
+  ]
+}
+
+Viewpoint {
+  orientation -0.1945 0.300 0.9338 1.214
+  position -0.60 -1.85 1.15
+}
+
+TexturedBackground {
+}
+
+TexturedBackgroundLight {
+}
+
+Floor {
+  translation 0 0 -0.8
+  size 6 6
+  tileSize 1 1
+}
+
+# Main Industrial Pedestal Table (Top surface at Z = 0.0)
+Solid {
+  translation 0 0 -0.4
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.7 0.72 0.75
+        roughness 0.4
+        metalness 0.8
+      }
+      geometry Box {
+        size 1.4 1.2 0.8
+      }
+    }
+  ]
+  name "cell_table"
+  boundingObject Box {
+    size 1.4 1.2 0.8
+  }
+}
+
+# Upstream Conveyor Extension Support Bench (supports X in [-1.35, -0.70])
+Solid {
+  translation -1.025 0.40 -0.4
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.55 0.58 0.62
+        roughness 0.5
+        metalness 0.7
+      }
+      geometry Box {
+        size 0.65 0.24 0.8
+      }
+    }
+  ]
+  name "infeed_extension_bench"
+  boundingObject Box {
+    size 0.65 0.24 0.8
+  }
+}
+
+# Indexed Hygienic Infeed Conveyor Belt (Spans X in [-1.30, +0.20], Y = 0.40, top Z = 0.040)
+Robot {
+  translation -0.55 0.40 0.0
+  name "infeed_conveyor"
+  controller "conveyor_controller"
+  children [
+    Emitter {
+      name "conveyor_status_emitter"
+      channel 42
+    }
+    Receiver {
+      name "conveyor_cmd_receiver"
+      channel 41
+    }
+    # Moving white food-grade belt track (top surface at Z = 0.040 m)
+    Track {
+      translation 0 0 0.030
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.96 0.96 0.96
+            roughness 0.9
+            metalness 0
+            emissiveColor 0.88 0.88 0.88
+          }
+          geometry DEF BELT_BO Box {
+            size 1.50 0.14 0.02
+          }
+        }
+      ]
+      boundingObject USE BELT_BO
+      physics Physics {
+        density -1
+        mass 1
+      }
+      device [
+        LinearMotor {
+          name "belt_motor"
+          acceleration -1
+          maxVelocity 0.5
+          sound ""
+        }
+      ]
+    }
+    # Static conveyor bed underneath belt
+    Pose {
+      translation 0 0 0.0095
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.22 0.25 0.28
+            roughness 0.5
+            metalness 0.6
+          }
+          geometry DEF CONVEYOR_BED Box {
+            size 1.50 0.14 0.019
+          }
+        }
+      ]
+    }
+    # Continuous side rails (top Z = 0.038 m, safely below belt surface & gripper plunge)
+    Pose {
+      translation 0 -0.078 0.019
+      children [
+        Shape {
+          appearance DEF RAIL_APPEARANCE PBRAppearance {
+            baseColor 0.20 0.23 0.27
+            roughness 0.4
+            metalness 0.8
+          }
+          geometry Box {
+            size 1.50 0.014 0.038
+          }
+        }
+      ]
+    }
+    Pose {
+      translation 0 0.078 0.019
+      children [
+        Shape {
+          appearance USE RAIL_APPEARANCE
+          geometry Box {
+            size 1.50 0.014 0.038
+          }
+        }
+      ]
+    }
+    # Optical arrival photo-eye at X_world = +0.022 m, beam across +Y at Z = 0.050 m
+    DistanceSensor {
+      translation 0.572 -0.072 0.050
+      rotation 0 0 1 1.5708
+      name "arrival_sensor"
+      type "laser"
+      aperture 0.005
+      numberOfRays 1
+      lookupTable [
+        0 0 0
+        0.2 0.2 0
+      ]
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.96 0.96 0.96
+            roughness 0.8
+            metalness 0
+            emissiveColor 0.88 0.88 0.88
+          }
+          geometry Box {
+            size 0.008 0.012 0.016
+          }
+        }
+      ]
+    }
+  ]
+  boundingObject USE CONVEYOR_BED
+}
+
+# 2x2 Blister Tray Presentation Fixture
+Solid {
+  translation 0.37 0.22 0.02
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.85 0.88 0.92
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 0.14 0.14 0.04
+      }
+    }
+  ]
+  name "blister_tray_fixture"
+  boundingObject Box {
+    size 0.14 0.14 0.04
+  }
+}
+
+# Gravity Remelt Reject Chute / Scrap Bin
+Solid {
+  translation -0.35 0.25 0.05
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.2 0.2
+        roughness 0.5
+        metalness 0
+      }
+      geometry Cylinder {
+        height 0.10
+        radius 0.08
+      }
+    }
+  ]
+  name "remelt_reject_chute"
+  boundingObject Cylinder {
+    height 0.10
+    radius 0.08
+  }
+}
+
+# ===========================================================================
+# 5-PIECE MIXED ARTISAN CHOCOLATE BATCH ON INFEED CONVEYOR (0.25 m pitch)
+# ===========================================================================
+
+# Piece 1: Normal Dark Chocolate (+45 deg boundary orientation -> Tray Slot 1)
+DEF CHOCOLATE_1 Solid {
+  translation -0.18 0.40 0.0505
+  rotation 0 0 1 0.785398
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.15 0.08 0.04
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.035 0.035 0.02
+      }
+    }
+  ]
+  name "chocolate_1_dark"
+  boundingObject Box {
+    size 0.035 0.035 0.02
+  }
+  physics Physics {
+    density -1
+    mass 0.025
+  }
+}
+
+# Piece 2: Defective Chipped Dark Chocolate (+45 deg -> Gravity Remelt Chute)
+DEF CHOCOLATE_2 Solid {
+  translation -0.43 0.40 0.0505
+  rotation 0 0 1 0.785398
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.10 0.05 0.025
+        roughness 0.8
+        metalness 0
+      }
+      geometry IndexedFaceSet {
+        coord Coordinate {
+          point [
+            -0.0175 0.0175 0.0100,
+            -0.0175 -0.0175 0.0100,
+            -0.0100 -0.0175 0.0100,
+            -0.0100 0.0175 0.0100,
+            0.0175 0.0175 0.0100,
+            0.0175 0.0100 0.0100,
+            -0.0100 0.0100 0.0100,
+            0.0175 -0.0100 0.0100,
+            0.0175 -0.0175 0.0100,
+            -0.0100 -0.0100 0.0100,
+            -0.0175 0.0175 -0.0100,
+            -0.0175 -0.0175 -0.0100,
+            -0.0100 -0.0175 -0.0100,
+            -0.0100 0.0175 -0.0100,
+            0.0175 0.0175 -0.0100,
+            0.0175 0.0100 -0.0100,
+            -0.0100 0.0100 -0.0100,
+            0.0175 -0.0100 -0.0100,
+            0.0175 -0.0175 -0.0100,
+            -0.0100 -0.0100 -0.0100
+          ]
+        }
+        coordIndex [
+          0, 1, 2, -1,
+          0, 2, 3, -1,
+          3, 4, 5, -1,
+          3, 5, 6, -1,
+          2, 8, 7, -1,
+          2, 7, 9, -1,
+          10, 12, 11, -1,
+          10, 13, 12, -1,
+          13, 15, 14, -1,
+          13, 16, 15, -1,
+          12, 18, 17, -1,
+          12, 17, 19, -1,
+          0, 10, 11, -1,
+          0, 11, 1, -1,
+          1, 11, 12, -1,
+          1, 12, 2, -1,
+          2, 12, 19, -1,
+          2, 19, 9, -1,
+          3, 13, 10, -1,
+          3, 10, 0, -1,
+          0, 10, 14, -1,
+          0, 14, 4, -1,
+          4, 14, 15, -1,
+          4, 15, 5, -1,
+          5, 15, 16, -1,
+          5, 16, 6, -1,
+          7, 17, 18, -1,
+          7, 18, 8, -1,
+          8, 18, 19, -1,
+          8, 19, 9, -1,
+          6, 16, 13, -1,
+          6, 13, 3, -1
+        ]
+        ccw TRUE
+      }
+    }
+  ]
+  name "chocolate_2_defect"
+  boundingObject Box {
+    size 0.035 0.035 0.02
+  }
+  physics Physics {
+    density -1
+    mass 0.025
+  }
+}
+
+# Piece 3: Normal Milk Chocolate (+45 deg -> Tray Slot 2)
+DEF CHOCOLATE_3 Solid {
+  translation -0.68 0.40 0.0505
+  rotation 0 0 1 0.785398
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.47 0.27 0.15
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.035 0.035 0.02
+      }
+    }
+  ]
+  name "chocolate_3_milk"
+  boundingObject Box {
+    size 0.035 0.035 0.02
+  }
+  physics Physics {
+    density -1
+    mass 0.025
+  }
+}
+
+# Piece 4: Normal Ruby Chocolate (+45 deg -> Tray Slot 3)
+DEF CHOCOLATE_4 Solid {
+  translation -0.93 0.40 0.0505
+  rotation 0 0 1 0.785398
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.75 0.27 0.55
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.035 0.035 0.02
+      }
+    }
+  ]
+  name "chocolate_4_ruby"
+  boundingObject Box {
+    size 0.035 0.035 0.02
+  }
+  physics Physics {
+    density -1
+    mass 0.025
+  }
+}
+
+# Piece 5: Normal White Chocolate (+45 deg -> Tray Slot 4)
+DEF CHOCOLATE_5 Solid {
+  translation -1.18 0.40 0.0505
+  rotation 0 0 1 0.785398
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.60 0.62 0.66
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.035 0.035 0.02
+      }
+    }
+  ]
+  name "chocolate_5_white"
+  boundingObject Box {
+    size 0.035 0.035 0.02
+  }
+  physics Physics {
+    density -1
+    mass 0.025
+  }
+}
+
+# Universal Robots UR5e Articulated Arm
+CellUR5e {
+  translation 0 0 0
+  controller "cell_supervisor_conveyor_demo"
+  supervisor TRUE
+  baseSlot [
+    Emitter {
+      name "conveyor_cmd_emitter"
+      channel 41
+    }
+    Receiver {
+      name "conveyor_status_receiver"
+      channel 42
+    }
+    Camera {
+      translation 0 0.4 0.8
+      rotation -0.57735 0.57735 0.57735 2.0944
+      name "camera"
+      fieldOfView 0.4646
+      width 640
+      height 480
+    }
+  ]
+  toolSlot [
+    DEF TOOL_MOUNT Pose {
+      rotation 1 0 0 -1.5708
+      children [
+        Robotiq2f85Gripper {
+        }
+        DEF TOUCH_SENSOR TouchSensor {
+          translation 0 0 0.100
+          name "touch_sensor"
+          boundingObject Box {
+            size 0.01 0.01 0.002
+          }
+        }
+      ]
+    }
+  ]
+}

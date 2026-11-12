@@ -30,14 +30,17 @@ artisan_confectionery_project/
 │   ├── confectionery_cell_white_test.wbt     # White variety classification & Slot 4 test
 │   ├── confectionery_cell_defect_test.wbt    # Notched defect geometry & chute test
 │   ├── confectionery_cell_grip_test.wbt      # Simulated lost-grip & Home recovery test
-│   └── confectionery_cell_multicycle_test.wbt # Two-cycle mock feeder handshake world
+│   ├── confectionery_cell_multicycle_test.wbt # Two-cycle mock feeder handshake world
+│   └── confectionery_cell_conveyor_demo.wbt  # Full 5-piece indexed conveyor sorting demo
 │
 ├── controllers/                    # Robot controllers
 │   ├── cell_supervisor/            # Primary supervisor controller package
 │   │   └── cell_supervisor.py      # Master Python Finite State Machine (FSM)
 │   ├── cell_supervisor_grip_test/  # Isolated lost-grip fault & Home verification test
 │   ├── cell_supervisor_multicycle_test/      # Two-cycle Emitter/Receiver FSM test
-│   └── cell_supervisor_multicycle_feeder/    # Supervisor mock feeder for Cycle 2 reset
+│   ├── cell_supervisor_multicycle_feeder/    # Supervisor mock feeder for Cycle 2 reset
+│   ├── conveyor_controller/        # Indexed conveyor Track motor & laser arrival gate
+│   └── cell_supervisor_conveyor_demo/        # 5-piece conveyor sorting & 4-cavity FSM demo
 │
 ├── protos/                         # Webots custom PROTO nodes
 │   ├── CellUR5e.proto              # UR5e with baseSlot for fixed overhead camera
@@ -59,6 +62,7 @@ artisan_confectionery_project/
 ├── data/                           # Runtime telemetry, snapshots & archived logs
 │   ├── production_metrics.csv      # Single-cycle & fault telemetry CSV
 │   ├── multicycle_test_metrics.csv # Two-cycle test telemetry CSV
+│   ├── conveyor_demo_metrics.csv   # 5-piece conveyor demo telemetry CSV
 │   ├── vision_validation/          # Saved Webots overhead camera raw & annotated snapshots
 │   └── final_report_evidence/      # Evidence index & captured Webots console transcripts
 │
@@ -117,6 +121,10 @@ flatpak run com.cyberbotics.webots --batch --mode=fast --no-rendering --stdout -
 ```
 
 Dedicated verification worlds are also provided under `worlds/` for each test case:
+* Full indexed conveyor batch sorting demo (`+45°` Dark, Chipped Defect, Milk, Ruby, White into 4 blister slots + remelt chute): `confectionery_cell_conveyor_demo.wbt`
+  ```bash
+  flatpak run com.cyberbotics.webots worlds/confectionery_cell_conveyor_demo.wbt
+  ```
 * Variety routing (`+45°`): `confectionery_cell_milk_test.wbt`, `confectionery_cell_ruby_test.wbt`, `confectionery_cell_white_test.wbt`
 * Surface defect scrap rejection: `confectionery_cell_defect_test.wbt`
 * Simulated lost-grip & Home recovery: `confectionery_cell_grip_test.wbt`
