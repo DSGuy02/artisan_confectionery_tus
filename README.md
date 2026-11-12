@@ -40,7 +40,7 @@ artisan_confectionery_project/
 │   ├── cell_supervisor_multicycle_test/      # Two-cycle Emitter/Receiver FSM test
 │   ├── cell_supervisor_multicycle_feeder/    # Supervisor mock feeder for Cycle 2 reset
 │   ├── conveyor_controller/        # Indexed conveyor Track motor & laser arrival gate
-│   └── cell_supervisor_conveyor_demo/        # 5-piece conveyor sorting & 4-cavity FSM demo
+│   └── cell_supervisor_conveyor_demo/        # 12-piece random batch & 4-compartment FSM demo
 │
 ├── protos/                         # Webots custom PROTO nodes
 │   ├── CellUR5e.proto              # UR5e with baseSlot for fixed overhead camera
@@ -62,7 +62,7 @@ artisan_confectionery_project/
 ├── data/                           # Runtime telemetry, snapshots & archived logs
 │   ├── production_metrics.csv      # Single-cycle & fault telemetry CSV
 │   ├── multicycle_test_metrics.csv # Two-cycle test telemetry CSV
-│   ├── conveyor_demo_metrics.csv   # 5-piece conveyor demo telemetry CSV
+│   ├── conveyor_demo_metrics.csv   # 12-piece conveyor demo telemetry CSV
 │   ├── vision_validation/          # Saved Webots overhead camera raw & annotated snapshots
 │   └── final_report_evidence/      # Evidence index & captured Webots console transcripts
 │
@@ -121,7 +121,7 @@ flatpak run com.cyberbotics.webots --batch --mode=fast --no-rendering --stdout -
 ```
 
 Dedicated verification worlds are also provided under `worlds/` for each test case:
-* Full indexed conveyor batch sorting demo (`+45°` Dark, Chipped Defect, Milk, Ruby, White into 4 blister slots + remelt chute): `confectionery_cell_conveyor_demo.wbt`
+* Full indexed conveyor random-batch sorting demo (12 shuffled chocolates across Dark, Milk, Ruby, White into 4 separate colour-coded compartments + hollow remelt scrap bin): `confectionery_cell_conveyor_demo.wbt`
   ```bash
   flatpak run com.cyberbotics.webots worlds/confectionery_cell_conveyor_demo.wbt
   ```
